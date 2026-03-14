@@ -1,0 +1,22 @@
+{
+  "productName": "Aurlum Doctor",
+  "version": "0.1.0",
+  "identifier": "com.aurlum.doctor",
+  "build": {
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Aurlum - 医師ダッシュボード",
+        "width": 1200,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
