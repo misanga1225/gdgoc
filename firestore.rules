@@ -2,21 +2,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 患者: 自分のセッションのみ読み書き可
+    // 患者セッション: パス直指定のみ許可。列挙（list）は禁止
     match /Patients/{sessionId} {
-      allow read: if true;  // URL知ってる人のみアクセスする想定
-      allow write: if false; // 書き込みは Cloud Functions 経由
+      allow get: if true;   // セッションIDを知っている場合のみ取得可
+      allow list: if false; // コレクション一覧取得を禁止（個人情報漏洩防止）
+      allow write: if false; // 書き込みは Cloud Functions 経由のみ
 
+      // 視線データ: セッションが watching 状態のときのみ書き込み可
       match /LiveGaze/{paragraphId} {
-        allow read: if true;
-        allow write: if true;  // 患者ブラウザから視線データを書き込む
+        allow get: if true;
+        allow list: if false;
+        allow write: if get(/databases/$(database)/documents/Patients/$(sessionId)).data.status == 'watching';
       }
     }
 
-    // 証跡: 読み取りのみ
+    // 証跡: パス直指定の読み取りのみ。書き込みは Cloud Functions のみ
     match /Evidence/{sessionId} {
-      allow read: if true;
-      allow write: if false;  // Cloud Functions のみ
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
     }
   }
 }
