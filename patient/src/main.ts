@@ -1,5 +1,5 @@
 import "./styles.css";
-import { getSession, updateSessionStatus } from "./api";
+import { getSession, updateSessionStatus, finalizeSession } from "./api";
 import { loadDocument } from "./document";
 import { createGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
@@ -121,16 +121,25 @@ async function main() {
     }
   });
 
-  // 最終同意ボタン（Phase 5で本格実装）
+  // 最終同意ボタン — finalize API でハッシュチェーン + KMS署名 + Evidence保存
   btnFinal.addEventListener("click", async () => {
     btnFinal.disabled = true;
     btnFinal.textContent = "処理中...";
     try {
-      // Phase 5: ここでfinalize APIを呼ぶ
-      await updateSessionStatus(sessionId, "completed");
+      const result = await finalizeSession(sessionId);
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
       btnFinal.textContent = "同意済み";
+
+      // 同意照会番号を表示
+      const refDiv = document.createElement("div");
+      refDiv.className = "status-bar completed";
+      refDiv.style.marginTop = "16px";
+      refDiv.innerHTML = `
+        <strong>同意照会番号:</strong> ${result.evidence_id}<br>
+        <small>ハッシュ: ${result.root_hash.substring(0, 16)}...</small>
+      `;
+      btnFinal.parentElement?.appendChild(refDiv);
     } catch (e) {
       console.error("Failed to finalize:", e);
       btnFinal.disabled = false;

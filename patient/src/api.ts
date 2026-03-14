@@ -29,3 +29,19 @@ export async function updateSessionStatus(
     throw new Error(err.error ?? `Status update failed: ${resp.status}`);
   }
 }
+
+/** 最終同意 — ハッシュチェーン計算 + KMS署名 + Evidence保存 */
+export async function finalizeSession(sessionId: string): Promise<{
+  evidence_id: string;
+  root_hash: string;
+  timestamp: string;
+}> {
+  const resp = await fetch(`${API_BASE}/sessions/${sessionId}/finalize`, {
+    method: "POST",
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error ?? `Finalize failed: ${resp.status}`);
+  }
+  return resp.json();
+}

@@ -1,4 +1,5 @@
 mod firestore;
+mod kms;
 mod storage;
 mod vertex_ai;
 
@@ -11,9 +12,13 @@ use axum::{
 };
 use chrono::Utc;
 use firestore::FirestoreClient;
+use kms::KmsClient;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
-use shared::{CreateSessionRequest, Session, SessionStatus, UpdateStatusRequest};
+use shared::{
+    compute_hash_chain, hash_document, CreateSessionRequest, GazeEntry, Session, SessionStatus,
+    UpdateStatusRequest,
+};
 use std::net::SocketAddr;
 use storage::StorageClient;
 use tower_http::cors::{Any, CorsLayer};
@@ -25,6 +30,7 @@ struct AppState {
     db: FirestoreClient,
     storage: StorageClient,
     ai: VertexAiClient,
+    kms: KmsClient,
 }
 
 async fn health() -> Json<Value> {
@@ -250,6 +256,158 @@ async fn summarize_missed(
     }
 }
 
+/// POST /sessions/:id/finalize — 最終同意：ハッシュチェーン計算 + KMS署名 + Evidence保存
+async fn finalize_session(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+) -> impl IntoResponse {
+    // セッション取得 + ステータス検証
+    let fields = match state.db.get_document("Patients", &session_id).await {
+        Ok(f) => f,
+        Err(e) if e.to_string() == "not_found" => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
+    };
+
+    let current_status_str = fields
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    if current_status_str != "authorized" {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "session must be in 'authorized' status to finalize" })),
+        );
+    }
+
+    let document_url = fields
+        .get("document_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    // 文書HTMLを取得してハッシュ化
+    let doc_hash = if !document_url.is_empty() {
+        match reqwest::get(&document_url).await {
+            Ok(resp) => match resp.text().await {
+                Ok(html) => hash_document(&html),
+                Err(_) => hash_document(""),
+            },
+            Err(_) => hash_document(""),
+        }
+    } else {
+        hash_document("")
+    };
+
+    // LiveGaze全件取得
+    let gaze_docs = match state
+        .db
+        .list_documents("Patients", &session_id, "LiveGaze")
+        .await
+    {
+        Ok(docs) => docs,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Failed to read gaze data: {}", e) })),
+            );
+        }
+    };
+
+    // GazeEntry に変換
+    let mut gaze_entries: Vec<GazeEntry> = gaze_docs
+        .iter()
+        .map(|doc| GazeEntry {
+            paragraph_id: doc
+                .get("paragraph_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            dwell_time: doc
+                .get("dwell_time")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            timestamp: doc
+                .get("last_updated")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+        })
+        .collect();
+
+    // タイムスタンプ順にソート
+    gaze_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+
+    // ハッシュチェーン計算
+    let root_hash = compute_hash_chain(&session_id, &doc_hash, &gaze_entries);
+
+    // KMS署名
+    let kms_signature = match state.kms.sign(root_hash.as_bytes()).await {
+        Ok(sig) => sig,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("KMS signing failed: {}", e) })),
+            );
+        }
+    };
+
+    let now = Utc::now().to_rfc3339();
+
+    // Evidence に保存
+    let mut evidence_fields = Map::new();
+    evidence_fields.insert("session_id".to_string(), json!(session_id));
+    evidence_fields.insert("root_hash".to_string(), json!(root_hash));
+    evidence_fields.insert("kms_signature".to_string(), json!(kms_signature));
+    evidence_fields.insert("blockchain_tx_hash".to_string(), json!(""));
+    evidence_fields.insert("timestamp".to_string(), json!(now));
+
+    if let Err(e) = state
+        .db
+        .create_document("Evidence", &session_id, evidence_fields)
+        .await
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to save evidence: {}", e) })),
+        );
+    }
+
+    // セッションステータスを completed に更新
+    let mut status_fields = Map::new();
+    status_fields.insert("status".to_string(), json!("completed"));
+
+    if let Err(e) = state
+        .db
+        .update_document("Patients", &session_id, status_fields, &["status"])
+        .await
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to update status: {}", e) })),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({
+            "evidence_id": session_id,
+            "root_hash": root_hash,
+            "timestamp": now,
+        })),
+    )
+}
+
 /// Session構造体をFirestore用のフィールドMapに変換
 fn session_to_fields(session: &Session) -> Map<String, Value> {
     let value = serde_json::to_value(session).unwrap_or(json!({}));
@@ -271,11 +429,17 @@ async fn main() {
         "Failed to initialize Firestore client. Ensure GCP credentials are available.",
     );
 
+    let kms_key_ring =
+        std::env::var("KMS_KEY_RING").unwrap_or_else(|_| "gdgoc-doctor-secret-key".to_string());
+    let kms_key_name =
+        std::env::var("KMS_KEY_NAME").unwrap_or_else(|_| "doctor-secret-key".to_string());
+
     let auth = db.auth();
     let storage = StorageClient::new(auth.clone(), &bucket);
-    let ai = VertexAiClient::new(auth, &project_id, &region, &gemini_model);
+    let ai = VertexAiClient::new(auth.clone(), &project_id, &region, &gemini_model);
+    let kms = KmsClient::new(auth, &project_id, &region, &kms_key_ring, &kms_key_name);
 
-    let state = AppState { db, storage, ai };
+    let state = AppState { db, storage, ai, kms };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -292,6 +456,7 @@ async fn main() {
             "/sessions/{id}/summarize-missed",
             post(summarize_missed),
         )
+        .route("/sessions/{id}/finalize", post(finalize_session))
         .with_state(state)
         .layer(cors);
 
