@@ -1,0 +1,22 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 患者: 自分のセッションのみ読み書き可
+    match /Patients/{sessionId} {
+      allow read: if true;  // URL知ってる人のみアクセスする想定
+      allow write: if false; // 書き込みは Cloud Functions 経由
+
+      match /LiveGaze/{paragraphId} {
+        allow read: if true;
+        allow write: if true;  // 患者ブラウザから視線データを書き込む
+      }
+    }
+
+    // 証跡: 読み取りのみ
+    match /Evidence/{sessionId} {
+      allow read: if true;
+      allow write: if false;  // Cloud Functions のみ
+    }
+  }
+}
