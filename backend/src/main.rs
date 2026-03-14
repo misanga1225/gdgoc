@@ -1,5 +1,6 @@
 mod firestore;
 mod storage;
+mod vertex_ai;
 
 use axum::{
     extract::{Path, State},
@@ -17,11 +18,13 @@ use std::net::SocketAddr;
 use storage::StorageClient;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
+use vertex_ai::{MissedParagraph, VertexAiClient};
 
 #[derive(Clone)]
 struct AppState {
     db: FirestoreClient,
     storage: StorageClient,
+    ai: VertexAiClient,
 }
 
 async fn health() -> Json<Value> {
@@ -212,6 +215,41 @@ async fn upload_document(
     )
 }
 
+/// 見落とし要約リクエスト
+#[derive(Deserialize)]
+struct SummarizeMissedRequest {
+    paragraphs: Vec<MissedParagraph>,
+}
+
+/// POST /sessions/:id/summarize-missed — 見落とし段落をAIで要約
+async fn summarize_missed(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(req): Json<SummarizeMissedRequest>,
+) -> impl IntoResponse {
+    // セッションの存在確認
+    if let Err(e) = state.db.get_document("Patients", &session_id).await {
+        if e.to_string() == "not_found" {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        );
+    }
+
+    match state.ai.summarize_missed(&req.paragraphs).await {
+        Ok(summary) => (StatusCode::OK, Json(json!({ "summary": summary }))),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("AI summarization failed: {}", e) })),
+        ),
+    }
+}
+
 /// Session構造体をFirestore用のフィールドMapに変換
 fn session_to_fields(session: &Session) -> Map<String, Value> {
     let value = serde_json::to_value(session).unwrap_or(json!({}));
@@ -224,14 +262,20 @@ async fn main() {
         std::env::var("GCP_PROJECT_ID").unwrap_or_else(|_| "gdgoc-490204".to_string());
     let bucket =
         std::env::var("STORAGE_BUCKET").unwrap_or_else(|_| "gdgoc-docs".to_string());
+    let region =
+        std::env::var("GCP_REGION").unwrap_or_else(|_| "asia-northeast1".to_string());
+    let gemini_model =
+        std::env::var("GEMINI_MODEL").unwrap_or_else(|_| "gemini-1.5-flash".to_string());
 
     let db = FirestoreClient::new(&project_id).await.expect(
         "Failed to initialize Firestore client. Ensure GCP credentials are available.",
     );
 
-    let storage = StorageClient::new(db.auth(), &bucket);
+    let auth = db.auth();
+    let storage = StorageClient::new(auth.clone(), &bucket);
+    let ai = VertexAiClient::new(auth, &project_id, &region, &gemini_model);
 
-    let state = AppState { db, storage };
+    let state = AppState { db, storage, ai };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -244,6 +288,10 @@ async fn main() {
         .route("/sessions/{id}", get(get_session))
         .route("/sessions/{id}/status", patch(update_session_status))
         .route("/documents/upload", post(upload_document))
+        .route(
+            "/sessions/{id}/summarize-missed",
+            post(summarize_missed),
+        )
         .with_state(state)
         .layer(cors);
 

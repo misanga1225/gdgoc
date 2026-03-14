@@ -6,3 +6,4 @@
 firebase.config.ts
 node_modules/
 patient/dist/
+doctor/dist/
