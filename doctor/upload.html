@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aurlum - 文書アップロード（医師用）</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: "Noto Sans JP", "Hiragino Sans", sans-serif;
+        background: #f5f5f5;
+        color: #333;
+        line-height: 1.6;
+      }
+      .container {
+        max-width: 640px;
+        margin: 40px auto;
+        padding: 32px 24px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      h1 {
+        font-size: 20px;
+        color: #1a73e8;
+        margin-bottom: 24px;
+        text-align: center;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      input[type="text"], input[type="file"] {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-top: 24px;
+      }
+      .btn-primary {
+        background: #1a73e8;
+        color: #fff;
+      }
+      .btn-primary:hover { background: #1557b0; }
+      .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+      #status {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        display: none;
+      }
+      #status.success {
+        display: block;
+        background: #e6f4ea;
+        color: #137333;
+      }
+      #status.error {
+        display: block;
+        background: #fce8e6;
+        color: #c5221f;
+      }
+      #status.info {
+        display: block;
+        background: #e8f0fe;
+        color: #1a73e8;
+      }
+      #preview {
+        margin-top: 16px;
+        padding: 16px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        font-size: 13px;
+      }
+      .result-url {
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 14px;
+        background: #f0f0f0;
+        padding: 8px;
+        border-radius: 4px;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Aurlum - 文書アップロード</h1>
+
+      <div class="form-group">
+        <label for="patient-name">患者名</label>
+        <input type="text" id="patient-name" placeholder="例: 佐藤 太郎" />
+      </div>
+
+      <div class="form-group">
+        <label for="patient-id">カルテID</label>
+        <input type="text" id="patient-id" placeholder="例: P001" />
+      </div>
+
+      <div class="form-group">
+        <label for="docx-file">同意書ファイル (.docx)</label>
+        <input type="file" id="docx-file" accept=".docx" />
+      </div>
+
+      <div id="preview"></div>
+
+      <button class="btn btn-primary" id="btn-upload" disabled>
+        アップロード＆セッション作成
+      </button>
+
+      <div id="status"></div>
+    </div>
+
+    <script src="https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js"></script>
+    <script src="upload.js"></script>
+  </body>
+</html>

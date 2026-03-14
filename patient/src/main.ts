@@ -1,2 +1,142 @@
+import "./styles.css";
+import { getSession, updateSessionStatus } from "./api";
+import { loadDocument } from "./document";
+import { createGazeProvider } from "./gaze";
+import { syncGazeData, watchSessionStatus } from "./sync";
+
 const app = document.getElementById("app")!;
-app.textContent = "Aurlum Patient App";
+
+async function main() {
+  // URLからセッションIDを取得
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session");
+
+  if (!sessionId) {
+    app.innerHTML = `<div class="error">セッションIDが指定されていません。</div>`;
+    return;
+  }
+
+  app.innerHTML = `<div class="loading">読み込み中...</div>`;
+
+  // セッション情報を取得
+  let session;
+  try {
+    session = await getSession(sessionId);
+  } catch {
+    app.innerHTML = `<div class="error">セッションが見つかりません。URLを確認してください。</div>`;
+    return;
+  }
+
+  // UIを構築
+  app.innerHTML = `
+    <div class="header">
+      <h1>Aurlum - 同意書閲覧</h1>
+      <div class="session-info">${session.name} 様</div>
+    </div>
+    <div class="status-bar watching" id="status-bar">閲覧中</div>
+    <div id="document-container"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-preliminary" disabled>
+        仮確認完了（医師へ送信）
+      </button>
+      <button class="btn btn-success" id="btn-final" style="display:none" disabled>
+        最終同意
+      </button>
+    </div>
+  `;
+
+  const statusBar = document.getElementById("status-bar")!;
+  const btnPreliminary = document.getElementById("btn-preliminary") as HTMLButtonElement;
+  const btnFinal = document.getElementById("btn-final") as HTMLButtonElement;
+  const container = document.getElementById("document-container")!;
+
+  // 文書を読み込み
+  let paragraphs: HTMLElement[];
+  try {
+    paragraphs = await loadDocument(session.document_url, container);
+  } catch {
+    container.innerHTML = `<div class="error">文書の読み込みに失敗しました。</div>`;
+    return;
+  }
+
+  if (paragraphs.length === 0) {
+    container.innerHTML = `<div class="error">文書に段落が見つかりません。</div>`;
+    return;
+  }
+
+  // ステータスをwatchingに遷移（waiting→watching）
+  if (session.status === "waiting") {
+    try {
+      await updateSessionStatus(sessionId, "watching");
+    } catch (e) {
+      console.error("Failed to update status to watching:", e);
+    }
+  }
+
+  // 視線追跡を開始
+  const gazeProvider = createGazeProvider();
+
+  gazeProvider.onUpdate(async (gazeData) => {
+    try {
+      await syncGazeData(sessionId, gazeData);
+    } catch (e) {
+      console.error("Failed to sync gaze data:", e);
+    }
+  });
+
+  gazeProvider.start(paragraphs);
+
+  // 仮確認ボタンを有効化
+  btnPreliminary.disabled = false;
+
+  btnPreliminary.addEventListener("click", async () => {
+    btnPreliminary.disabled = true;
+    btnPreliminary.textContent = "送信中...";
+    try {
+      gazeProvider.stop();
+      await updateSessionStatus(sessionId, "reviewed");
+      btnPreliminary.textContent = "送信済み - 医師の確認をお待ちください";
+      statusBar.textContent = "医師の確認待ち";
+      statusBar.className = "status-bar reviewed";
+    } catch (e) {
+      console.error("Failed to update status:", e);
+      btnPreliminary.disabled = false;
+      btnPreliminary.textContent = "仮確認完了（医師へ送信）";
+    }
+  });
+
+  // 医師からのステータス変更を監視
+  watchSessionStatus(sessionId, (status) => {
+    if (status === "authorized") {
+      statusBar.textContent = "医師が最終同意を許可しました";
+      statusBar.className = "status-bar authorized";
+      btnPreliminary.style.display = "none";
+      btnFinal.style.display = "inline-block";
+      btnFinal.disabled = false;
+    } else if (status === "completed") {
+      statusBar.textContent = "同意が完了しました";
+      statusBar.className = "status-bar completed";
+      btnFinal.disabled = true;
+      btnFinal.textContent = "同意済み";
+    }
+  });
+
+  // 最終同意ボタン（Phase 5で本格実装）
+  btnFinal.addEventListener("click", async () => {
+    btnFinal.disabled = true;
+    btnFinal.textContent = "処理中...";
+    try {
+      // Phase 5: ここでfinalize APIを呼ぶ
+      await updateSessionStatus(sessionId, "completed");
+      statusBar.textContent = "同意が完了しました";
+      statusBar.className = "status-bar completed";
+      btnFinal.textContent = "同意済み";
+    } catch (e) {
+      console.error("Failed to finalize:", e);
+      btnFinal.disabled = false;
+      btnFinal.textContent = "最終同意";
+    }
+  });
+}
+
+main().catch(console.error);
