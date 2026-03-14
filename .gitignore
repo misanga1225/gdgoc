@@ -2,4 +2,7 @@
 .env
 .env.local
 !.env.example
+!.env.local.example
 firebase.config.ts
+node_modules/
+patient/dist/
