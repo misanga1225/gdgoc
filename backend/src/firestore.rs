@@ -136,6 +136,47 @@ impl FirestoreClient {
         }
         Ok(())
     }
+
+    /// サブコレクション内の全ドキュメントを取得する
+    pub async fn list_documents(
+        &self,
+        parent_collection: &str,
+        parent_id: &str,
+        sub_collection: &str,
+    ) -> Result<Vec<Map<String, Value>>, Box<dyn std::error::Error>> {
+        let token = self.get_token().await?;
+        let url = format!(
+            "{}/{}/{}/{}",
+            self.base_url, parent_collection, parent_id, sub_collection
+        );
+
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let err = resp.text().await?;
+            return Err(format!("Firestore list failed: {}", err).into());
+        }
+
+        let result: Value = resp.json().await?;
+        let documents = result
+            .get("documents")
+            .and_then(|d| d.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let mut docs = Vec::new();
+        for doc in &documents {
+            if let Some(fields) = doc.get("fields").and_then(|f| f.as_object()) {
+                docs.push(from_firestore_fields(fields));
+            }
+        }
+        Ok(docs)
+    }
 }
 
 /// JSON値をFirestoreのフィールド形式に変換

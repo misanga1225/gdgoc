@@ -1049,11 +1049,13 @@ name = "gdgoc"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "chrono",
  "gcp_auth",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "sha2",
  "shared",
  "tokio",
  "tower-http",
@@ -3470,6 +3472,7 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "sha2",
 ]
 
 [[package]]
