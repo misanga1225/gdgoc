@@ -1,4 +1,10 @@
-import type { ElementAttentionRecord } from "./types.js";
+/** DOM要素ごとの注意度記録 */
+export interface ElementAttentionRecord {
+  element: Element;
+  accumulatedAttention: number;
+  totalDwellTime: number;
+  lastUpdatedAt: number;
+}
 
 /**
  * DOM要素ごとに注意度を蓄積する。
