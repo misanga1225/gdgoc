@@ -13,7 +13,7 @@
 - **視線検知:** MediaPipe
 - **リアルタイム同期:** Firestore (`onSnapshot` による双方向同期)
 - **文書処理:** Mammoth.js (DOCXからID付HTMLへの変換)
-- **バックエンド:** Cloud Functions (Rust)
+- **バックエンド:** Cloud Run (container, Rust)
 - **データベース:** Firestore（実データと永続データで分ける）
 - **ストレージ:** Cloud Storage (HTMLドキュメントの管理)
 - **セキュリティ:** Cloud KMS (医師の鍵によるデジタル署名)
@@ -43,8 +43,8 @@
 
 ### STEP 4: 【患者】最終同意と証拠の固定（オンチェーン）
 1. 患者の画面にリアルタイムで**「最終同意」**ボタンが有効化される
-2. 患者が「最終同意」をクリックすると、最終ハッシュが Cloud Functions へ送信される
-3. **署名・記録:** Cloud Functions がハッシュを検証し、**Cloud KMS** で署名。その後、Firestoreの `Evidence` に保存
+2. 患者が「最終同意」をクリックすると、最終ハッシュが Cloud Run へ送信される
+3. **署名・記録:** Cloud Run がハッシュを検証し、**Cloud KMS** で署名。その後、Firestoreの `Evidence` に保存
 4. **完了:** 患者画面に「同意照会番号」を表示し、URLを即時無効化
 5. **（将来的な展望）:** 蓄積された`Evidence` のルートハッシュを、定期的にブロックチェーン（Polygon等）にアンカーとして記録（展望）
 

@@ -1,4 +1,4 @@
-name: Deploy to Cloud Functions 2nd gen
+name: Deploy to Cloud Run
 
 on:
   push:
@@ -60,20 +60,20 @@ jobs:
           docker push "${IMAGE_URI}"
           echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
 
-      - name: Deploy to Cloud Functions 2nd gen
+      - name: Deploy to Cloud Run
         run: |
-          gcloud functions deploy ${{ env.FUNCTION_NAME }} \
-            --gen2 \
+          gcloud run deploy ${{ env.FUNCTION_NAME }} \
             --project="${{ secrets.GCP_PROJECT_ID }}" \
             --region="${{ secrets.GCP_REGION }}" \
-            --docker-image="${IMAGE_URI}" \
-            --trigger-http \
+            --platform=managed \
+            --image="${IMAGE_URI}" \
             --allow-unauthenticated \
             --memory=512Mi \
             --cpu=1 \
             --timeout=60s \
             --min-instances=0 \
             --max-instances=10 \
+            --port=8080 \
             --set-env-vars="\
           GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }},\
           GCP_REGION=${{ secrets.GCP_REGION }},\
