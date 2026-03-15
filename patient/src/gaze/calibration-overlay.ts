@@ -5,6 +5,9 @@ import { extractIrisData } from "../mediapipe/iris-tracker.js";
 import { estimateHeadPose } from "../mediapipe/head-pose-estimator.js";
 import type { Point2D } from "../types.js";
 
+/** 顔未検出が続いた場合のタイムアウト（秒） */
+const FACE_LOST_TIMEOUT_SEC = 30;
+
 /**
  * キャリブレーション用フルスクリーンオーバーレイ
  *
@@ -19,6 +22,7 @@ export class CalibrationOverlay {
 
   /**
    * キャリブレーションを実行する（Promise ベース）
+   * 顔が一定時間検出されない場合は自動的にタイムアウトして reject する
    * @returns meanError キャリブレーション誤差
    */
   async run(
@@ -32,6 +36,8 @@ export class CalibrationOverlay {
     calibManager.start();
 
     return new Promise<number>((resolve, reject) => {
+      let faceLostSince = 0;
+
       const loop = () => {
         if (!this.canvas || !this.ctx) {
           reject(new Error("Overlay was removed"));
@@ -39,6 +45,7 @@ export class CalibrationOverlay {
         }
 
         const timestampMs = performance.now();
+        const now = timestampMs / 1000;
         const result = faceLandmarker.detect(video, timestampMs);
         const landmarks = result?.faceLandmarks?.[0] ?? null;
         const transformMatrix = result?.facialTransformationMatrixes?.[0] ?? null;
@@ -62,6 +69,27 @@ export class CalibrationOverlay {
         const progress = state.elapsed / 1.5;
         this.drawCalibrationPoint(currentPoint, Math.min(progress, 1));
 
+        // 顔未検出のタイムアウト判定
+        const faceDetected = landmarks && landmarks.length >= 478;
+        if (!faceDetected) {
+          if (faceLostSince === 0) faceLostSince = now;
+          if (now - faceLostSince > FACE_LOST_TIMEOUT_SEC) {
+            this.unmount();
+            reject(new Error("キャリブレーション中に顔が検出されませんでした。カメラの位置を確認してください。"));
+            return;
+          }
+          // ステータスに警告表示
+          if (this.statusEl) {
+            const remaining = Math.ceil(FACE_LOST_TIMEOUT_SEC - (now - faceLostSince));
+            this.statusEl.textContent =
+              `顔が検出されません — カメラの前に顔を合わせてください（${remaining}秒後にスキップ）`;
+          }
+          requestAnimationFrame(loop);
+          return;
+        }
+
+        faceLostSince = 0;
+
         // ステータス更新
         if (this.statusEl) {
           this.statusEl.textContent =
@@ -69,46 +97,44 @@ export class CalibrationOverlay {
         }
 
         // 顔が検出されている場合のみサンプル収集
-        if (landmarks && landmarks.length >= 478) {
-          const iris = extractIrisData(landmarks);
-          const headPose = estimateHeadPose(
-            landmarks,
-            transformMatrix as { data: Float32Array } | null,
-          );
+        const iris = extractIrisData(landmarks);
+        const headPose = estimateHeadPose(
+          landmarks,
+          transformMatrix as { data: Float32Array } | null,
+        );
 
-          if (iris) {
-            const features = gazeEstimator.extractFeatures(iris, headPose);
-            const collecting = calibManager.addSample(features, 1 / 30);
+        if (iris) {
+          const features = gazeEstimator.extractFeatures(iris, headPose);
+          const collecting = calibManager.addSample(features, 1 / 30);
 
-            if (!collecting) {
-              // キャリブレーション完了
-              try {
-                const {
-                  regression,
-                  meanError,
-                  lensGammaX,
-                  lensGammaY,
-                  headKx,
-                  headKy,
-                  selectedFeatures,
-                } = calibManager.compute();
+          if (!collecting) {
+            // キャリブレーション完了
+            try {
+              const {
+                regression,
+                meanError,
+                lensGammaX,
+                lensGammaY,
+                headKx,
+                headKy,
+                selectedFeatures,
+              } = calibManager.compute();
 
-                gazeEstimator.setRegression(
-                  regression,
-                  { x: lensGammaX, y: lensGammaY },
-                  headKx,
-                  headKy,
-                  selectedFeatures,
-                );
+              gazeEstimator.setRegression(
+                regression,
+                { x: lensGammaX, y: lensGammaY },
+                headKx,
+                headKy,
+                selectedFeatures,
+              );
 
-                this.unmount();
-                resolve(meanError);
-              } catch (e) {
-                this.unmount();
-                reject(e);
-              }
-              return;
+              this.unmount();
+              resolve(meanError);
+            } catch (e) {
+              this.unmount();
+              reject(e);
             }
+            return;
           }
         }
 

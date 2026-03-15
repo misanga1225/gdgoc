@@ -119,13 +119,17 @@ async function main() {
     btnPreliminary.disabled = true;
     btnPreliminary.textContent = "送信中...";
     try {
+      gazeProvider.stop(); // 最終データをフラッシュしてから status を更新
       await updateSessionStatus(sessionId, "reviewed");
-      gazeProvider.stop();
       btnPreliminary.textContent = "送信済み - 医師の確認をお待ちください";
       statusBar.textContent = "医師の確認待ち";
       statusBar.className = "status-bar reviewed";
     } catch (e) {
       console.error("Failed to update status:", e);
+      gazeProvider.start(paragraphs); // status 更新失敗時は追跡を再開
+      gazeProvider.onUpdate(async (gazeData) => {
+        try { await syncGazeData(sessionId, gazeData); } catch {}
+      });
       btnPreliminary.disabled = false;
       btnPreliminary.textContent = "仮確認完了（医師へ送信）";
     }

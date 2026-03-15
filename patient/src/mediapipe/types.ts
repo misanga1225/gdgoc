@@ -71,6 +71,6 @@ export const LANDMARKS = {
   // 頭部姿勢推定用
   NOSE_TIP: 1,
   CHIN: 152,
-  LEFT_EYE_INNER_CORNER: 263,
+  LEFT_EYE_INNER_CORNER: 362,
   RIGHT_EYE_INNER_CORNER: 33,
 } as const;
