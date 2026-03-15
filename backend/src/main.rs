@@ -77,22 +77,58 @@ async fn create_session(
     }
 }
 
-/// GET /sessions/:id — セッション取得
+/// GET /sessions/:id — セッション取得（document_urlを署名付きURLに変換して返す）
 async fn get_session(
     State(state): State<AppState>,
     Path(session_id): Path<String>,
-) -> impl IntoResponse {
-    match state.db.get_document("Patients", &session_id).await {
-        Ok(fields) => (StatusCode::OK, Json(Value::Object(fields))),
-        Err(e) if e.to_string() == "not_found" => (
-            StatusCode::NOT_FOUND,
-            Json(json!({ "error": "session not found" })),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        ),
+) -> (StatusCode, Json<Value>) {
+    let mut fields = match state.db.get_document("Patients", &session_id).await {
+        Ok(f) => f,
+        Err(e) if e.to_string() == "not_found" => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
+    };
+
+    // document_url（オブジェクト名）から署名付きURLを生成
+    let obj_name = fields
+        .get("document_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if !obj_name.is_empty() {
+        // 旧形式（完全URL）の場合はオブジェクト名を抽出
+        let bucket = state.storage.bucket_name().to_string();
+        let object_name = if obj_name.starts_with("https://") {
+            let prefix = format!("{}/", bucket);
+            obj_name
+                .rsplit_once(&prefix)
+                .map(|(_, name)| name.to_string())
+                .unwrap_or(obj_name)
+        } else {
+            obj_name
+        };
+
+        match state.storage.generate_signed_url(&object_name, 3600).await {
+            Ok(signed_url) => {
+                fields.insert("document_url".to_string(), json!(signed_url));
+            }
+            Err(e) => {
+                eprintln!("Failed to generate signed URL: {}", e);
+            }
+        }
     }
+
+    (StatusCode::OK, Json(Value::Object(fields)))
 }
 
 /// PATCH /sessions/:id/status — ステータス更新
@@ -296,13 +332,22 @@ async fn finalize_session(
         .unwrap_or("")
         .to_string();
 
-    // 文書HTMLを取得してハッシュ化
-    let doc_hash = if !document_url.is_empty() {
-        match reqwest::get(&document_url).await {
-            Ok(resp) => match resp.text().await {
-                Ok(html) => hash_document(&html),
-                Err(_) => hash_document(""),
-            },
+    // document_urlからオブジェクト名を取得（旧形式の完全URL対応）
+    let object_name = if document_url.starts_with("https://") {
+        let bucket = state.storage.bucket_name().to_string();
+        let prefix = format!("{}/", bucket);
+        document_url
+            .rsplit_once(&prefix)
+            .map(|(_, name)| name.to_string())
+            .unwrap_or(document_url)
+    } else {
+        document_url
+    };
+
+    // 文書HTMLをCloud Storageから取得してハッシュ化（サーバー間通信）
+    let doc_hash = if !object_name.is_empty() {
+        match state.storage.download_object(&object_name).await {
+            Ok(html) => hash_document(&html),
             Err(_) => hash_document(""),
         }
     } else {
@@ -416,6 +461,10 @@ fn session_to_fields(session: &Session) -> Map<String, Value> {
 
 #[tokio::main]
 async fn main() {
+    // プロジェクトルートの .env を読み込む
+    let env_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.env");
+    dotenvy::from_path(&env_path).ok();
+
     let project_id =
         std::env::var("GCP_PROJECT_ID").unwrap_or_else(|_| "gdgoc-490204".to_string());
     let bucket =
@@ -434,8 +483,11 @@ async fn main() {
     let kms_key_name =
         std::env::var("KMS_KEY_NAME").unwrap_or_else(|_| "doctor-secret-key".to_string());
 
+    let service_account_email = std::env::var("SERVICE_ACCOUNT_EMAIL")
+        .expect("SERVICE_ACCOUNT_EMAIL must be set (e.g. your-sa@project.iam.gserviceaccount.com)");
+
     let auth = db.auth();
-    let storage = StorageClient::new(auth.clone(), &bucket);
+    let storage = StorageClient::new(auth.clone(), &bucket, &service_account_email);
     let ai = VertexAiClient::new(auth.clone(), &project_id, &region, &gemini_model);
     let kms = KmsClient::new(auth, &project_id, &region, &kms_key_ring, &kms_key_name);
 

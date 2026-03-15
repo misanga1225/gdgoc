@@ -8,6 +8,8 @@ import { db } from "./firebase";
 import { getSession, updateSessionStatus, summarizeMissed } from "./api";
 import { showToast } from "./toast";
 
+const PATIENT_ORIGIN = import.meta.env.VITE_PATIENT_URL ?? "http://localhost:5173";
+
 /** 段落が「十分に閲覧された」とみなす閾値（秒） */
 const DWELL_THRESHOLD = 3;
 
@@ -61,7 +63,14 @@ export async function renderMonitorView(
     }
   }
 
+  const patientUrl = `${PATIENT_ORIGIN}/?session=${sessionId}`;
+
   container.innerHTML = `
+    <div class="patient-url-banner" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <span style="font-weight:600;white-space:nowrap;">患者用URL:</span>
+      <code style="background:#fff;padding:4px 8px;border-radius:4px;font-size:13px;word-break:break-all;flex:1;" id="patient-url-text">${patientUrl}</code>
+      <button class="btn btn-sm btn-outline" id="btn-copy-url" style="white-space:nowrap;">コピー</button>
+    </div>
     <div class="monitor-header">
       <div>
         <h2>${name} 様のモニタリング</h2>
@@ -75,6 +84,13 @@ export async function renderMonitorView(
     <div id="ai-summary-area"></div>
     <div class="monitor-document" id="monitor-doc">${docHtml || "<p>文書がまだアップロードされていません</p>"}</div>
   `;
+
+  // 患者URLコピーボタン
+  document.getElementById("btn-copy-url")?.addEventListener("click", () => {
+    navigator.clipboard.writeText(patientUrl).then(() => {
+      showToast("URLをコピーしました", "success");
+    });
+  });
 
   const monitorStatus = document.getElementById("monitor-status")!;
   const progressBar = document.getElementById("progress-bar")!;
