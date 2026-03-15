@@ -80,4 +80,5 @@ jobs:
           STORAGE_BUCKET=${{ secrets.STORAGE_BUCKET }},\
           KMS_KEY_RING=${{ secrets.KMS_KEY_RING }},\
           KMS_KEY_NAME=${{ secrets.KMS_KEY_NAME }},\
-          GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}"
+          GEMINI_MODEL=${{ secrets.GEMINI_MODEL }},\
+          SERVICE_ACCOUNT_EMAIL=${{ secrets.SERVICE_ACCOUNT_EMAIL }}"
