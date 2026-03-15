@@ -66,7 +66,7 @@ jobs:
             --gen2 \
             --project="${{ secrets.GCP_PROJECT_ID }}" \
             --region="${{ secrets.GCP_REGION }}" \
-            --image="${IMAGE_URI}" \
+            --docker-image="${IMAGE_URI}" \
             --trigger-http \
             --allow-unauthenticated \
             --memory=512Mi \
