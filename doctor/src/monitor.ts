@@ -122,6 +122,7 @@ export async function renderMonitorView(
   }
 
   // セッションステータスの監視
+  let prevStatus = status;
   const sessionRef = doc(db, "Patients", sessionId);
   unsubSession = onSnapshot(sessionRef, (snap) => {
     const data = snap.data();
@@ -130,6 +131,12 @@ export async function renderMonitorView(
     monitorStatus.textContent = statusLabel(newStatus);
     monitorStatus.className = `status-badge ${newStatus}`;
     renderActions(actionsDiv, sessionId, newStatus, paragraphs, gazeMap, monitorDoc, aiArea);
+
+    // reviewed に遷移した瞬間に見落とし通知を自動発火
+    if (newStatus === "reviewed" && prevStatus !== "reviewed") {
+      autoNotifyOversight(sessionId, paragraphs, gazeMap, monitorDoc, aiArea);
+    }
+    prevStatus = newStatus;
   });
 }
 
@@ -173,32 +180,18 @@ function renderActions(
 ): void {
   actionsDiv.innerHTML = "";
 
-  // 見落とし要約ボタン（watching or reviewed のとき）
+  // 見落とし分析ボタン（watching or reviewed のとき）
   if (status === "watching" || status === "reviewed") {
     const btnSummary = document.createElement("button");
     btnSummary.className = "btn btn-outline btn-sm";
-    btnSummary.textContent = "AI要約を取得";
+    btnSummary.textContent = "見落とし分析を再取得";
     btnSummary.style.marginRight = "8px";
     btnSummary.addEventListener("click", async () => {
       btnSummary.disabled = true;
-      btnSummary.textContent = "要約中...";
-
-      const missed = getMissedParagraphs(paragraphs, gazeMap, monitorDoc);
-      if (missed.length === 0) {
-        aiArea.innerHTML = `<div class="ai-summary"><h3>AI要約</h3><p>見落とし箇所はありません。</p></div>`;
-        btnSummary.disabled = false;
-        btnSummary.textContent = "AI要約を取得";
-        return;
-      }
-
-      try {
-        const { summary } = await summarizeMissed(sessionId, missed);
-        aiArea.innerHTML = `<div class="ai-summary"><h3>AI要約 — 見落とし箇所</h3><p>${summary}</p></div>`;
-      } catch (e) {
-        showToast(`要約取得エラー: ${e}`, "error");
-      }
+      btnSummary.textContent = "分析中...";
+      await fetchAndDisplayOversight(sessionId, paragraphs, gazeMap, monitorDoc, aiArea);
       btnSummary.disabled = false;
-      btnSummary.textContent = "AI要約を取得";
+      btnSummary.textContent = "見落とし分析を再取得";
     });
     actionsDiv.appendChild(btnSummary);
   }
@@ -246,6 +239,60 @@ function getMissedParagraphs(
     }
   }
   return missed;
+}
+
+/** 見落とし分析を取得して aiArea に表示する（手動/自動共通） */
+async function fetchAndDisplayOversight(
+  sessionId: string,
+  paragraphs: HTMLElement[],
+  gazeMap: Map<string, GazeData>,
+  monitorDoc: HTMLElement,
+  aiArea: HTMLElement,
+): Promise<void> {
+  const missed = getMissedParagraphs(paragraphs, gazeMap, monitorDoc);
+
+  if (missed.length === 0) {
+    aiArea.innerHTML = `
+      <div class="ai-summary" style="border-left:4px solid #34a853;padding:12px 16px;background:#e6f4ea;border-radius:4px;margin:12px 0;">
+        <h3 style="margin:0 0 4px;">見落とし分析</h3>
+        <p style="margin:0;">見落とし箇所はありません。患者は全段落を十分に閲覧しています。</p>
+      </div>`;
+    return;
+  }
+
+  aiArea.innerHTML = `
+    <div class="ai-summary" style="border-left:4px solid #e37400;padding:12px 16px;background:#fef7e0;border-radius:4px;margin:12px 0;">
+      <h3 style="margin:0 0 4px;">見落とし分析中...</h3>
+      <p style="margin:0;">${missed.length}箇所の見落としを検出しました。AIが分析しています...</p>
+    </div>`;
+
+  try {
+    const { summary } = await summarizeMissed(sessionId, missed);
+    aiArea.innerHTML = `
+      <div class="ai-summary" style="border-left:4px solid #d93025;padding:12px 16px;background:#fce8e6;border-radius:4px;margin:12px 0;">
+        <h3 style="margin:0 0 8px;">見落とし通知 — ${missed.length}箇所</h3>
+        <div style="white-space:pre-wrap;line-height:1.6;">${summary}</div>
+      </div>`;
+  } catch (e) {
+    showToast(`見落とし分析エラー: ${e}`, "error");
+    aiArea.innerHTML = `
+      <div class="ai-summary" style="border-left:4px solid #d93025;padding:12px 16px;background:#fce8e6;border-radius:4px;margin:12px 0;">
+        <h3 style="margin:0 0 4px;">見落とし通知</h3>
+        <p style="margin:0;">分析の取得に失敗しました。「見落とし分析を再取得」ボタンで再試行してください。</p>
+      </div>`;
+  }
+}
+
+/** reviewed 遷移時に自動で見落とし通知を発火 */
+async function autoNotifyOversight(
+  sessionId: string,
+  paragraphs: HTMLElement[],
+  gazeMap: Map<string, GazeData>,
+  monitorDoc: HTMLElement,
+  aiArea: HTMLElement,
+): Promise<void> {
+  showToast("患者が仮確認を完了しました。見落とし分析を実行中...", "info");
+  await fetchAndDisplayOversight(sessionId, paragraphs, gazeMap, monitorDoc, aiArea);
 }
 
 function statusLabel(status: string): string {

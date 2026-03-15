@@ -1,7 +1,7 @@
 import "./styles.css";
 import { getSession, updateSessionStatus, finalizeSession } from "./api";
 import { loadDocument } from "./document";
-import { createGazeProvider } from "./gaze";
+import { createGazeProvider, MediaPipeGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
 
 const app = document.getElementById("app")!;
@@ -74,7 +74,33 @@ async function main() {
   }
 
   // 視線追跡を開始
-  const gazeProvider = createGazeProvider();
+  statusBar.textContent = "視線追跡を準備中...";
+  statusBar.className = "status-bar watching";
+  const gazeProvider = await createGazeProvider();
+
+  if (gazeProvider instanceof MediaPipeGazeProvider) {
+    // MediaPipe: キャリブレーション実行
+    statusBar.textContent = "キャリブレーション中...";
+    try {
+      const meanError = await gazeProvider.calibrate();
+      if (meanError > 0.15) {
+        statusBar.textContent = `キャリブレーション精度が低めです（${(meanError * 100).toFixed(1)}%）— 閲覧を続行します`;
+        statusBar.className = "status-bar reviewed";
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    } catch (e) {
+      console.error("キャリブレーション失敗:", e);
+    }
+    statusBar.textContent = "閲覧中";
+    statusBar.className = "status-bar watching";
+  } else {
+    // Mock フォールバック: カメラが利用できないことを通知
+    statusBar.textContent = "カメラが利用できないため簡易追跡モードです";
+    statusBar.className = "status-bar reviewed";
+    await new Promise((r) => setTimeout(r, 2000));
+    statusBar.textContent = "閲覧中";
+    statusBar.className = "status-bar watching";
+  }
 
   gazeProvider.onUpdate(async (gazeData) => {
     try {
@@ -93,8 +119,8 @@ async function main() {
     btnPreliminary.disabled = true;
     btnPreliminary.textContent = "送信中...";
     try {
-      gazeProvider.stop();
       await updateSessionStatus(sessionId, "reviewed");
+      gazeProvider.stop();
       btnPreliminary.textContent = "送信済み - 医師の確認をお待ちください";
       statusBar.textContent = "医師の確認待ち";
       statusBar.className = "status-bar reviewed";
