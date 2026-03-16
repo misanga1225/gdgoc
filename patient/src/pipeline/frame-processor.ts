@@ -67,7 +67,7 @@ export class FrameProcessor {
         };
         gazeConfidence = 0.1;
       } else {
-        gazePoint = this.gazeEstimator.estimate(iris, headPose);
+        gazePoint = this.gazeEstimator.estimate(iris, headPose, dt);
         gazePoint = {
           x: this.gazeFilterX.update(gazePoint.x, dt),
           y: this.gazeFilterY.update(gazePoint.y, dt),

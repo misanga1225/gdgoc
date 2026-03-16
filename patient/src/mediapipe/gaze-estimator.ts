@@ -1,6 +1,7 @@
 import type { IrisResult, HeadPoseResult, GazeFeatures } from "./types.js";
 import type { RidgeRegression } from "../calibration/ridge-regression.js";
 import type { Point2D } from "../types.js";
+import { OneEuroFilter } from "../temporal-filter.js";
 
 /**
  * 視線推定器
@@ -13,10 +14,19 @@ export class GazeEstimator {
   private headKx: number = 0; // 頭部回転補正係数 x (正規化座標/度)
   private headKy: number = 0; // 頭部回転補正係数 y (正規化座標/度)
   private selectedFeatures: number[] | null = null; // LOO-CVで選択された特徴量インデックス
-  // 虹彩ratio EMAプリフィルタ（estimate()内で急激な眼球動作による回帰オーバーシュートを抑制）
-  private irisEma = { lX: 0.5, lY: 0.5, rX: 0.5, rY: 0.5 };
-  private irisEmaInitialized = false; // 最初のフレームで生データに初期化
-  private static readonly IRIS_EMA_ALPHA = 0.4; // τ≈83ms at 30fps
+  // 虹彩ratio One-Euroプリフィルタ（速度適応型: 注視時は強平滑化、サッカード時は低遅延）
+  // fc_min=1.5Hz: 注視時の強い平滑化（τ≈106ms）
+  // beta=30: サッカード速度~3 units/sでfc≈90Hz（ほぼ素通し）
+  // d_cutoff=1.0Hz: 速度信号自体の平滑化
+  private static readonly IRIS_FC_MIN = 1.5;
+  private static readonly IRIS_BETA = 30;
+  private static readonly IRIS_D_CUTOFF = 1.0;
+  private irisFilter = {
+    lX: new OneEuroFilter(GazeEstimator.IRIS_FC_MIN, GazeEstimator.IRIS_BETA, GazeEstimator.IRIS_D_CUTOFF, 0.5),
+    lY: new OneEuroFilter(GazeEstimator.IRIS_FC_MIN, GazeEstimator.IRIS_BETA, GazeEstimator.IRIS_D_CUTOFF, 0.5),
+    rX: new OneEuroFilter(GazeEstimator.IRIS_FC_MIN, GazeEstimator.IRIS_BETA, GazeEstimator.IRIS_D_CUTOFF, 0.5),
+    rY: new OneEuroFilter(GazeEstimator.IRIS_FC_MIN, GazeEstimator.IRIS_BETA, GazeEstimator.IRIS_D_CUTOFF, 0.5),
+  };
   private yOffset: number = 0; // Y軸オフセット補正（ユーザー調整用）
 
   /** キャリブレーション済みの回帰モデルを設定 */
@@ -83,28 +93,20 @@ export class GazeEstimator {
     this.yOffset = offset;
   }
 
-  estimate(iris: IrisResult, headPose: HeadPoseResult): Point2D {
-    // EMA初期化: 最初のフレームで生データに設定（0.5からの収束バイアスを除去）
-    if (!this.irisEmaInitialized) {
-      this.irisEma = {
-        lX: iris.leftRatioX, lY: iris.leftRatioY,
-        rX: iris.rightRatioX, rY: iris.rightRatioY,
-      };
-      this.irisEmaInitialized = true;
-    }
-    // 虹彩ratioをEMAで平滑化（急激な眼球動作による回帰オーバーシュートを抑制）
-    const a = GazeEstimator.IRIS_EMA_ALPHA;
-    const e = this.irisEma;
-    e.lX += a * (iris.leftRatioX - e.lX);
-    e.lY += a * (iris.leftRatioY - e.lY);
-    e.rX += a * (iris.rightRatioX - e.rX);
-    e.rY += a * (iris.rightRatioY - e.rY);
+  estimate(iris: IrisResult, headPose: HeadPoseResult, dt: number = 1 / 30): Point2D {
+    // 虹彩ratioをOne-Euro Filterで平滑化
+    // 注視時は強い平滑化でジッタを抑え、サッカード時はカットオフを上げて遅延を最小化
+    const f = this.irisFilter;
+    const lX = f.lX.update(iris.leftRatioX, dt);
+    const lY = f.lY.update(iris.leftRatioY, dt);
+    const rX = f.rX.update(iris.rightRatioX, dt);
+    const rY = f.rY.update(iris.rightRatioY, dt);
     const smoothedIris: IrisResult = {
       ...iris,
-      leftRatioX: e.lX, leftRatioY: e.lY,
-      rightRatioX: e.rX, rightRatioY: e.rY,
-      avgRatioX: (e.lX + e.rX) / 2,
-      avgRatioY: (e.lY + e.rY) / 2,
+      leftRatioX: lX, leftRatioY: lY,
+      rightRatioX: rX, rightRatioY: rY,
+      avgRatioX: (lX + rX) / 2,
+      avgRatioY: (lY + rY) / 2,
     };
 
     if (this.regression) {
@@ -142,8 +144,10 @@ export class GazeEstimator {
     this.headKx = 0;
     this.headKy = 0;
     this.selectedFeatures = null;
-    this.irisEma = { lX: 0.5, lY: 0.5, rX: 0.5, rY: 0.5 };
-    this.irisEmaInitialized = false;
+    this.irisFilter.lX.reset(0.5);
+    this.irisFilter.lY.reset(0.5);
+    this.irisFilter.rX.reset(0.5);
+    this.irisFilter.rY.reset(0.5);
     this.yOffset = 0;
   }
 }

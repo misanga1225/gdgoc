@@ -318,8 +318,6 @@ export class CalibrationManager {
     const nPoints = this.points.length;
     if (nPoints < 3) return { gammaX: defaultGamma, gammaY: defaultGamma };
 
-    const gammaCandidates = [0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-
     // LOO予測を収集（各点を1つずつholdout）
     const looPredictions: { predX: number; predY: number; targetX: number; targetY: number }[] = [];
 
@@ -352,15 +350,13 @@ export class CalibrationManager {
 
     if (looPredictions.length === 0) return { gammaX: defaultGamma, gammaY: defaultGamma };
 
-    // 各軸でγをスイープし、LOO誤差が最小のγを選択
+    // 黄金分割法による連続γ最適化
+    // 離散グリッド探索 {0.35,...,1.0} を連続探索に置き換え、精度0.01で最適γを特定
     function findBestGamma(
       preds: typeof looPredictions,
       axis: "x" | "y",
     ): number {
-      let bestGamma = defaultGamma;
-      let bestError = Infinity;
-
-      for (const g of gammaCandidates) {
+      function evalGamma(g: number): number {
         let totalError = 0;
         for (const p of preds) {
           const pred = axis === "x" ? p.predX : p.predY;
@@ -368,18 +364,47 @@ export class CalibrationManager {
           const corrected = lensCorrectValue(pred, g);
           totalError += (corrected - target) ** 2;
         }
-        if (totalError < bestError) {
-          bestError = totalError;
-          bestGamma = g;
+        return totalError;
+      }
+
+      // 黄金分割法: 区間 [0.2, 1.2] を精度 0.01 まで収束
+      const PHI = (1 + Math.sqrt(5)) / 2;
+      let a = 0.2, b = 1.2;
+      let c = b - (b - a) / PHI;
+      let d = a + (b - a) / PHI;
+      let fc = evalGamma(c);
+      let fd = evalGamma(d);
+
+      while (Math.abs(b - a) > 0.01) {
+        if (fc < fd) {
+          b = d;
+          d = c;
+          fd = fc;
+          c = b - (b - a) / PHI;
+          fc = evalGamma(c);
+        } else {
+          a = c;
+          c = d;
+          fc = fd;
+          d = a + (b - a) / PHI;
+          fd = evalGamma(d);
         }
       }
-      return bestGamma;
+
+      const optimalGamma = (a + b) / 2;
+
+      // フォールバック: γ=1.0（恒等変換）より悪化する場合は1.0を使用
+      const errorOptimal = evalGamma(optimalGamma);
+      const errorIdentity = evalGamma(1.0);
+      if (errorOptimal > errorIdentity) return 1.0;
+
+      return optimalGamma;
     }
 
     const gammaX = findBestGamma(looPredictions, "x");
     const gammaY = findBestGamma(looPredictions, "y");
 
-    console.log(`[CalibrationManager] optimized lensGamma (LOO-CV): X=${gammaX.toFixed(1)}, Y=${gammaY.toFixed(1)}`);
+    console.log(`[CalibrationManager] optimized lensGamma (golden-section): X=${gammaX.toFixed(3)}, Y=${gammaY.toFixed(3)}`);
     return { gammaX, gammaY };
   }
 

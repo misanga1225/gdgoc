@@ -34,6 +34,10 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private faceLostSince = 0;
   private faceLostWarningEl: HTMLDivElement | null = null;
 
+  // デバッグ用視線ポインタ
+  private gazePointerEl: HTMLDivElement | null = null;
+  private debugGaze = true; // 視線ポインタ表示フラグ
+
   // 前フレームの視線座標（Region導出用）
   private lastGazePoint = { x: 0.5, y: 0.5 };
 
@@ -126,6 +130,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("mousemove", this.onMouseMove);
     this.hideFaceLostWarning();
+    this.removeGazePointer();
 
     this.faceLandmarker.close();
 
@@ -177,6 +182,11 @@ export class MediaPipeGazeProvider implements GazeProvider {
 
     // 視線座標を保存（次フレームのRegion導出用）
     this.lastGazePoint = frameInput.gaze.point;
+
+    // デバッグ用視線ポインタの更新
+    if (this.debugGaze) {
+      this.updateGazePointer(frameInput.gaze.point, frameInput.gaze.faceDetected);
+    }
 
     // 注意度モデルで融合
     const output = this.attentionModel.update(frameInput);
@@ -268,6 +278,40 @@ export class MediaPipeGazeProvider implements GazeProvider {
     if (this.faceLostWarningEl) {
       this.faceLostWarningEl.remove();
       this.faceLostWarningEl = null;
+    }
+  }
+
+  /** デバッグ用視線ポインタを更新する */
+  private updateGazePointer(
+    point: { x: number; y: number },
+    faceDetected: boolean,
+  ): void {
+    if (!this.gazePointerEl) {
+      this.gazePointerEl = document.createElement("div");
+      this.gazePointerEl.style.cssText =
+        "position:fixed;width:18px;height:18px;border-radius:50%;" +
+        "pointer-events:none;z-index:99999;transform:translate(-50%,-50%);" +
+        "border:2px solid rgba(255,255,255,0.8);" +
+        "box-shadow:0 0 8px rgba(0,0,0,0.4);" +
+        "transition:opacity 0.15s;";
+      document.body.appendChild(this.gazePointerEl);
+    }
+
+    const px = point.x * window.innerWidth;
+    const py = point.y * window.innerHeight;
+    this.gazePointerEl.style.left = `${px}px`;
+    this.gazePointerEl.style.top = `${py}px`;
+    this.gazePointerEl.style.background = faceDetected
+      ? "rgba(66,133,244,0.7)"  // 青: 顔検出中
+      : "rgba(234,67,53,0.7)";  // 赤: 顔ロスト
+    this.gazePointerEl.style.opacity = faceDetected ? "1" : "0.5";
+  }
+
+  /** デバッグ用視線ポインタを削除する */
+  private removeGazePointer(): void {
+    if (this.gazePointerEl) {
+      this.gazePointerEl.remove();
+      this.gazePointerEl = null;
     }
   }
 }
