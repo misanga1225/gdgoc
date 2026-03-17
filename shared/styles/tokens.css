@@ -1,0 +1,51 @@
+:root {
+  --color-bg-base: #f7f9fb;
+  --color-bg-surface: #ffffff;
+  --color-border-default: #e5e7eb;
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #6b7280;
+
+  --color-brand-primary: #0f766e;
+  --color-brand-primary-hover: #0d5f59;
+  --color-brand-soft: #ecfdf5;
+
+  --color-attention-primary: #f59e0b;
+  --color-attention-soft: #fff7ed;
+  --color-overlay-default: rgba(15, 23, 42, 0.36);
+  --color-focus-ring: rgba(15, 118, 110, 0.18);
+
+  --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  --font-size-display: 24px;
+  --font-size-section-title: 18px;
+  --font-size-card-title: 16px;
+  --font-size-body: 14px;
+  --font-size-small: 12px;
+  --font-size-label: 12px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-button: 8px;
+  --radius-panel: 12px;
+  --radius-modal: 16px;
+
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-modal: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  --layout-max-width: 1440px;
+  --layout-content-min: 760px;
+  --layout-content-max: 860px;
+
+  --z-base: 1;
+  --z-overlay: 1000;
+  --z-modal: 1010;
+}

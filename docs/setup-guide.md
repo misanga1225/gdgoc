@@ -70,7 +70,7 @@ cp patient/.env.local.example patient/.env.local
 | `VITE_FIREBASE_STORAGE_BUCKET` | Firebase Storage バケット |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase App ID |
-| `VITE_API_BASE_URL` | バックエンドAPI URL（デフォルト: `http://localhost:8080`） |
+| `VITE_API_BASE_URL` | バックエンドAPI URL（デフォルト: `http://localhost:8081`） |
 
 > Firebase の値は [Firebase Console](https://console.firebase.google.com/) > プロジェクト設定 > アプリ から確認できます。
 
@@ -103,7 +103,7 @@ cd C:/Programing/gdgoc
 cargo run -p gdgoc
 ```
 
-`Listening on 0.0.0.0:8080` と表示されたら起動完了。
+`Listening on 0.0.0.0:8081` と表示されたら起動完了。
 
 ### ターミナル2: 患者アプリ
 
