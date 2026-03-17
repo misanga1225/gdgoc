@@ -21,6 +21,11 @@ export class CalibrationManager {
     this.config = { ...DEFAULT_CALIBRATION_CONFIG, ...config };
   }
 
+  /** キャリブレーション設定を返す */
+  getConfig(): Readonly<CalibrationConfig> {
+    return this.config;
+  }
+
   /** キャリブレーションを開始する */
   start(): void {
     this.points = this.generateGridPoints();
