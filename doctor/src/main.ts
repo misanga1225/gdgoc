@@ -1,8 +1,12 @@
+import "../../shared/styles/tokens.css";
+import "../../shared/styles/base.css";
 import "./styles.css";
+import "./styles/doctor-main.css";
 import { getSession } from "./api";
 import { renderUploadView } from "./upload";
 import { renderMonitorView, cleanupMonitor } from "./monitor";
 import { getSavedSessionIds, addSessionId } from "./sessions";
+import { renderDoctorMainPage } from "./pages/DoctorMainPage";
 
 const app = document.getElementById("app")!;
 
@@ -15,7 +19,10 @@ async function main() {
     <div class="sidebar">
       <div class="sidebar-header">
         <h1>Aurlum</h1>
-        <button class="btn btn-primary btn-sm" id="btn-new">新規作成</button>
+        <div class="sidebar-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-d05-mock">D-05</button>
+          <button class="btn btn-primary btn-sm" id="btn-new">新規作成</button>
+        </div>
       </div>
       <div class="sidebar-list" id="session-list"></div>
     </div>
@@ -25,16 +32,27 @@ async function main() {
   `;
 
   const btnNew = document.getElementById("btn-new")!;
+  const btnD05Mock = document.getElementById("btn-d05-mock")!;
   const mainContent = document.getElementById("main-content")!;
+
+  btnD05Mock.addEventListener("click", () => {
+    activeSessionId = null;
+    cleanupMonitor();
+    highlightActive();
+    mainContent.classList.add("main-content--d05");
+    renderDoctorMainPage(mainContent);
+  });
 
   btnNew.addEventListener("click", () => {
     activeSessionId = null;
     cleanupMonitor();
     highlightActive();
+    mainContent.classList.remove("main-content--d05");
     renderUploadView(mainContent, (sessionId) => {
       addSessionId(sessionId);
       activeSessionId = sessionId;
       refreshSessionList();
+      mainContent.classList.remove("main-content--d05");
       renderMonitorView(mainContent, sessionId);
     });
   });
@@ -89,6 +107,7 @@ async function refreshSessionList() {
       activeSessionId = id;
       cleanupMonitor();
       highlightActive();
+      mainContent.classList.remove("main-content--d05");
       renderMonitorView(mainContent, id);
     });
   }
