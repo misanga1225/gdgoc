@@ -13,3 +13,7 @@
 ## Review (2026-03-15)
 - Summary: Added SERVICE_ACCOUNT_EMAIL to Cloud Run deploy env vars to prevent startup failure.
 - Tests: Not run (CI deploy change only).
+
+## Review (2026-03-17)
+- Summary: Optimized gaze data emission to O(n) and made monitor view apply LiveGaze updates incrementally to reduce DOM work.
+- Tests: Not run (not requested).
