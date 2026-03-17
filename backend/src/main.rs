@@ -10,7 +10,7 @@ use axum::{
     routing::{get, patch, post},
     Json, Router,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use firestore::FirestoreClient;
 use kms::KmsClient;
 use serde::Deserialize;
@@ -98,6 +98,11 @@ async fn get_session(
         }
     };
 
+    // 有効期限・完了済みチェック
+    if let Err(e) = check_session_accessible(&fields) {
+        return e;
+    }
+
     // document_url（オブジェクト名）から署名付きURLを生成
     let obj_name = fields
         .get("document_url")
@@ -153,6 +158,11 @@ async fn update_session_status(
         }
     };
 
+    // 有効期限・完了済みチェック
+    if let Err(e) = check_session_accessible(&fields) {
+        return e;
+    }
+
     let current_status_str = fields
         .get("status")
         .and_then(|v| v.as_str())
@@ -207,18 +217,25 @@ async fn upload_document(
     State(state): State<AppState>,
     Json(req): Json<UploadDocumentRequest>,
 ) -> impl IntoResponse {
-    // セッションの存在確認
-    if let Err(e) = state.db.get_document("Patients", &req.session_id).await {
-        if e.to_string() == "not_found" {
+    // セッションの存在確認 + 有効期限・完了済みチェック
+    match state.db.get_document("Patients", &req.session_id).await {
+        Ok(fields) => {
+            if let Err(e) = check_session_accessible(&fields) {
+                return e;
+            }
+        }
+        Err(e) if e.to_string() == "not_found" => {
             return (
                 StatusCode::NOT_FOUND,
                 Json(json!({ "error": "session not found" })),
             );
         }
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        );
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
     }
 
     // Cloud Storageにアップロード
@@ -269,18 +286,25 @@ async fn summarize_missed(
     Path(session_id): Path<String>,
     Json(req): Json<SummarizeMissedRequest>,
 ) -> impl IntoResponse {
-    // セッションの存在確認
-    if let Err(e) = state.db.get_document("Patients", &session_id).await {
-        if e.to_string() == "not_found" {
+    // セッションの存在確認 + 有効期限・完了済みチェック
+    match state.db.get_document("Patients", &session_id).await {
+        Ok(fields) => {
+            if let Err(e) = check_session_accessible(&fields) {
+                return e;
+            }
+        }
+        Err(e) if e.to_string() == "not_found" => {
             return (
                 StatusCode::NOT_FOUND,
                 Json(json!({ "error": "session not found" })),
             );
         }
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        );
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
     }
 
     match state.ai.summarize_missed(&req.paragraphs).await {
@@ -313,6 +337,17 @@ async fn finalize_session(
             );
         }
     };
+
+    // 有効期限チェック（completedは除く：finalizeは authorized → completed の遷移なので）
+    let expires_at_str = fields.get("expires_at").and_then(|v| v.as_str()).unwrap_or("");
+    if let Ok(expiry) = expires_at_str.parse::<DateTime<Utc>>() {
+        if Utc::now() > expiry {
+            return (
+                StatusCode::GONE,
+                Json(json!({ "error": "session has expired" })),
+            );
+        }
+    }
 
     let current_status_str = fields
         .get("status")
@@ -428,13 +463,14 @@ async fn finalize_session(
         );
     }
 
-    // セッションステータスを completed に更新
+    // セッションステータスを completed に更新 + expires_at を即時無効化
     let mut status_fields = Map::new();
     status_fields.insert("status".to_string(), json!("completed"));
+    status_fields.insert("expires_at".to_string(), json!(now)); // 同意完了時刻 = 即時無効化
 
     if let Err(e) = state
         .db
-        .update_document("Patients", &session_id, status_fields, &["status"])
+        .update_document("Patients", &session_id, status_fields, &["status", "expires_at"])
         .await
     {
         return (
@@ -451,6 +487,36 @@ async fn finalize_session(
             "timestamp": now,
         })),
     )
+}
+
+/// セッションの有効期限と完了状態をチェックする
+/// 期限切れ or 完了済みの場合は Err を返す
+fn check_session_accessible(fields: &Map<String, Value>) -> Result<(), (StatusCode, Json<Value>)> {
+    // 完了済みセッションは無効
+    let status = fields.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    if status == "completed" {
+        return Err((
+            StatusCode::GONE,
+            Json(json!({ "error": "this session has already been completed" })),
+        ));
+    }
+
+    // 有効期限チェック
+    let expires_at = fields
+        .get("expires_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    if let Ok(expiry) = expires_at.parse::<DateTime<Utc>>() {
+        if Utc::now() > expiry {
+            return Err((
+                StatusCode::GONE,
+                Json(json!({ "error": "session has expired" })),
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 /// Session構造体をFirestore用のフィールドMapに変換
