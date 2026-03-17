@@ -36,8 +36,8 @@ export const DEFAULT_CALIBRATION_CONFIG: CalibrationConfig = {
     { x: 0.45, y: 0.55 },
     { x: 0.55, y: 0.55 },
   ],
-  dwellTimeSec: 1.5,
-  warmupTimeSec: 0.8,
+  dwellTimeSec: 2.5,
+  warmupTimeSec: 1.0,
   margin: 0.02,
   lensGamma: 0.75,
 };

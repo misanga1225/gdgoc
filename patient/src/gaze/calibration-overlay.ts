@@ -8,6 +8,9 @@ import type { Point2D } from "../types.js";
 /** 顔未検出が続いた場合のタイムアウト（秒） */
 const FACE_LOST_TIMEOUT_SEC = 30;
 
+/** カウントダウン秒数 */
+const COUNTDOWN_SEC = 3;
+
 /**
  * キャリブレーション用フルスクリーンオーバーレイ
  *
@@ -34,6 +37,12 @@ export class CalibrationOverlay {
     this.mount();
     calibManager.reset();
     calibManager.start();
+
+    const config = calibManager.getConfig();
+    const firstPoint = calibManager.getCurrentPoint();
+
+    // カウントダウンフェーズ
+    await this.showCountdown(firstPoint);
 
     return new Promise<number>((resolve, reject) => {
       let faceLostSince = 0;
@@ -65,9 +74,11 @@ export class CalibrationOverlay {
           return;
         }
 
-        // キャリブレーション点を描画
-        const progress = state.elapsed / 1.5;
-        this.drawCalibrationPoint(currentPoint, Math.min(progress, 1));
+        // warmup中のフェードイン進捗（0→1）
+        const warmupProgress = Math.min(state.elapsed / config.warmupTimeSec, 1);
+        // 全体の進捗（0→1）
+        const progress = state.elapsed / config.dwellTimeSec;
+        this.drawCalibrationPoint(currentPoint, Math.min(progress, 1), warmupProgress);
 
         // 顔未検出のタイムアウト判定
         const faceDetected = landmarks && landmarks.length >= 478;
@@ -145,6 +156,68 @@ export class CalibrationOverlay {
     });
   }
 
+  /**
+   * 3秒カウントダウンを表示する
+   * 最初のキャリブレーション点を薄く予告表示しつつ、中央にカウントダウンを描画
+   */
+  private showCountdown(firstPoint: Point2D | null): Promise<void> {
+    return new Promise((resolve) => {
+      const startTime = performance.now();
+
+      const tick = () => {
+        if (!this.canvas || !this.ctx) {
+          resolve();
+          return;
+        }
+
+        const elapsed = (performance.now() - startTime) / 1000;
+        const remaining = COUNTDOWN_SEC - elapsed;
+
+        if (remaining <= 0) {
+          resolve();
+          return;
+        }
+
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        const cx = this.canvas.width / 2;
+        const cy = this.canvas.height / 2;
+
+        // 説明テキスト
+        if (this.statusEl) {
+          this.statusEl.textContent = "黄色い点を目で追ってください";
+        }
+
+        // 最初の点を薄く予告表示
+        if (firstPoint) {
+          this.drawCalibrationPoint(firstPoint, 0, 0.3);
+        }
+
+        // カウントダウン数字
+        const count = Math.ceil(remaining);
+        ctx.save();
+        ctx.font = "bold 120px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // フェード効果（各数字が切り替わるときにフェード）
+        const fraction = remaining - Math.floor(remaining);
+        const alpha = Math.min(fraction * 2, 1);
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
+        ctx.shadowBlur = 30;
+        ctx.fillText(`${count}`, cx, cy);
+        ctx.restore();
+
+        requestAnimationFrame(tick);
+      };
+
+      requestAnimationFrame(tick);
+    });
+  }
+
   private mount(): void {
     // コンテナ
     this.container = document.createElement("div");
@@ -193,14 +266,22 @@ export class CalibrationOverlay {
     this.statusEl = null;
   }
 
-  private drawCalibrationPoint(point: Point2D, progress: number): void {
+  /**
+   * キャリブレーション点を描画する
+   * @param point 描画位置 [0,1]
+   * @param progress 進捗アーク（0→1）
+   * @param opacity 全体の不透明度（0→1）。warmup中のフェードインに使用
+   */
+  private drawCalibrationPoint(point: Point2D, progress: number, opacity: number = 1): void {
     if (!this.ctx || !this.canvas) return;
     const ctx = this.ctx;
     const x = point.x * this.canvas.width;
     const y = point.y * this.canvas.height;
 
-    // グロー
     ctx.save();
+    ctx.globalAlpha = opacity;
+
+    // グロー
     ctx.shadowColor = "rgba(255, 255, 0, 0.8)";
     ctx.shadowBlur = 20;
 
@@ -210,19 +291,25 @@ export class CalibrationOverlay {
     ctx.strokeStyle = "rgba(255, 255, 0, 0.9)";
     ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.restore();
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
 
     // 進捗アーク
-    ctx.beginPath();
-    ctx.arc(x, y, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-    ctx.strokeStyle = "rgba(0, 255, 0, 1)";
-    ctx.lineWidth = 4;
-    ctx.stroke();
+    if (progress > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, 30, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.strokeStyle = "rgba(0, 255, 0, 1)";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
 
     // 中心点
     ctx.beginPath();
     ctx.arc(x, y, 8, 0, Math.PI * 2);
     ctx.fillStyle = "yellow";
     ctx.fill();
+
+    ctx.restore();
   }
 }

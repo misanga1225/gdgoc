@@ -204,6 +204,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
 
     const records = this.elementTracker.getAllRecords();
     const gazeData: ParagraphGaze[] = [];
+    const seen = new Set<string>();
 
     for (const record of records) {
       const el = record.element as HTMLElement;
@@ -215,13 +216,14 @@ export class MediaPipeGazeProvider implements GazeProvider {
         dwellTime: record.totalDwellTime,
         isReached: record.totalDwellTime > 0,
       });
+      seen.add(paragraphId);
     }
 
     // paragraphs のうちトラッカーに記録がないもの（一度も見られていない）
     for (const p of this.paragraphs) {
       const pid = p.getAttribute("data-paragraph-id");
       if (!pid) continue;
-      if (gazeData.some((g) => g.paragraphId === pid)) continue;
+      if (seen.has(pid)) continue;
       gazeData.push({ paragraphId: pid, dwellTime: 0, isReached: false });
     }
 
