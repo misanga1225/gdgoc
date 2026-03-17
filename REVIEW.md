@@ -49,3 +49,7 @@
 ## Review (2026-03-17, end-session modal checklist centering)
 - Summary: Updated the end-session modal checklist so each item is explicitly rendered with a leading `・` and centered directly under the intro text, removing default list indentation dependency.
 - Tests: `cmd /c npx tsc --noEmit` in `doctor` passed.
+
+## Review (2026-03-18, common-spec document update)
+- Summary: Updated both `docs/design-system-development-spec.md` and `docs/ui-development-spec.md` to reflect agreed common-spec rules: mandatory `data-variant`/`data-size` for `createButton`, checklist-dot + centered checklist presentation for checklist-bearing modals, required `body.modal-open` background-scroll lock, and default D-05 modal copy ownership in `createEndSessionModal`.
+- Tests: Not run (documentation update only).

@@ -291,3 +291,20 @@
 - 初回共通化は最小限に留める
 - D-05 専用の見た目は doctor 側に閉じる
 - 今後の他画面で再利用できるのは、まず `tokens.css` と `base.css` と `Button` と `Modal`
+
+## 14. 共通仕様更新（2026-03-18）
+以下は共通仕様タスクで確定した追記事項であり、本仕様書の該当章（Button / Modal / 完了条件）より優先して適用する。
+
+### 14-1. Button 追記事項
+- `shared/components/Button.ts` の `createButton` を利用して生成するすべてのボタンは、`data-variant` と `data-size` を必須で持つ。
+- `data-variant` は `primary / secondary`、`data-size` は `default / small` を表す。
+- 既存クラス運用（`.btn-*`）と併用する。
+
+### 14-2. Modal 追記事項
+- チェックリスト項目を表示する Modal は、各行先頭に `・` を明示表示する。
+- チェックリスト項目を表示する Modal は、説明文直下に中央揃えで表示する。
+- Modal 表示中は `body.modal-open` を付与し、背景スクロールを停止することを必須挙動とする。
+- D-05 終了確認で使う既定文言セットは、共通 Modal 側（`createEndSessionModal`）が保持する。
+
+### 14-3. 運用ルール
+- 本追記事項の適用対象は D-05 に限定しない。`createButton` / 共通 Modal を使う今後の画面にも適用する。

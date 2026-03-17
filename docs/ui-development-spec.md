@@ -305,3 +305,18 @@
 - READMEの将来像とは段階が異なる
 - 実装は Vanilla TypeScript 前提
 - 初回は D-05 を中心に、今後の他画面開発の土台を作る
+
+## 16. 共通仕様更新反映（2026-03-18）
+本仕様書で `shared/components/Button.ts` および `shared/components/Modal.ts` を利用する際は、以下の共通仕様を適用する。
+
+### 16-1. Button 利用ルール
+- `createButton` で生成するボタンは `data-variant` と `data-size` を必須で持つ。
+- 値は `data-variant: primary / secondary`、`data-size: default / small` とする。
+
+### 16-2. Modal 利用ルール
+- チェックリストを含む Modal は、各行先頭に `・` を表示し、説明文直下で中央揃えにする。
+- Modal 表示中は `body.modal-open` により背景スクロールを停止する。
+- D-05 終了確認モーダルの既定文言は共通 Modal 側（`createEndSessionModal`）が保持する。
+
+### 16-3. D-05 での適用
+- D-05 の終了確認モーダルは 16-2 のルールを満たすことを完了条件に含める。
