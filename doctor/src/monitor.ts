@@ -19,6 +19,8 @@ interface GazeData {
   is_reached: boolean;
 }
 
+type GazeStatus = "unseen" | "missed" | "ok";
+
 /** 現在のリスナーを管理 */
 let unsubGaze: Unsubscribe | null = null;
 let unsubSession: Unsubscribe | null = null;
@@ -104,7 +106,19 @@ export async function renderMonitorView(
   );
 
   // 現在の視線データ
+  const paragraphMap = new Map<string, HTMLElement>();
+  for (const el of paragraphs) {
+    const id = el.dataset.paragraphId;
+    if (id) paragraphMap.set(id, el);
+  }
+
   const gazeMap = new Map<string, GazeData>();
+  const statusMap = new Map<string, GazeStatus>();
+  let okCount = 0;
+  for (const [id, el] of paragraphMap) {
+    statusMap.set(id, "unseen");
+    applyStatusClass(el, "unseen");
+  }
 
   // アクションボタンをレンダリング
   renderActions(actionsDiv, sessionId, status, paragraphs, gazeMap, monitorDoc, aiArea);
@@ -113,11 +127,25 @@ export async function renderMonitorView(
   if (paragraphs.length > 0) {
     const gazeRef = collection(db, "Patients", sessionId, "LiveGaze");
     unsubGaze = onSnapshot(gazeRef, (snapshot) => {
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() as GazeData;
-        gazeMap.set(data.paragraph_id, data);
-      });
-      updateVisualization(paragraphs, gazeMap, progressBar);
+      for (const change of snapshot.docChanges()) {
+        const data = change.doc.data() as GazeData;
+        if (!data?.paragraph_id) continue;
+        if (change.type === "removed") {
+          gazeMap.delete(data.paragraph_id);
+        } else {
+          gazeMap.set(data.paragraph_id, data);
+        }
+        applyParagraphStatus(
+          data.paragraph_id,
+          paragraphMap,
+          gazeMap,
+          statusMap,
+          (deltaOk) => {
+            okCount += deltaOk;
+          },
+        );
+      }
+      updateProgress(progressBar, okCount, paragraphs.length);
     });
   }
 
@@ -141,30 +169,49 @@ export async function renderMonitorView(
 }
 
 /** 段落の色分けと進捗を更新 */
-function updateVisualization(
-  paragraphs: HTMLElement[],
-  gazeMap: Map<string, GazeData>,
-  progressBar: HTMLElement
-): void {
-  let okCount = 0;
+function classifyStatus(gaze?: GazeData): GazeStatus {
+  if (!gaze || !gaze.is_reached) return "unseen";
+  return gaze.dwell_time >= DWELL_THRESHOLD ? "ok" : "missed";
+}
 
-  for (const el of paragraphs) {
-    const id = el.dataset.paragraphId!;
-    const gaze = gazeMap.get(id);
-
-    el.classList.remove("gaze-ok", "gaze-missed", "gaze-unseen");
-
-    if (!gaze || !gaze.is_reached) {
-      el.classList.add("gaze-unseen");
-    } else if (gaze.dwell_time >= DWELL_THRESHOLD) {
-      el.classList.add("gaze-ok");
-      okCount++;
-    } else {
-      el.classList.add("gaze-missed");
-    }
+function applyStatusClass(el: HTMLElement, status: GazeStatus): void {
+  el.classList.remove("gaze-ok", "gaze-missed", "gaze-unseen");
+  if (status === "ok") {
+    el.classList.add("gaze-ok");
+  } else if (status === "missed") {
+    el.classList.add("gaze-missed");
+  } else {
+    el.classList.add("gaze-unseen");
   }
+}
 
-  const pct = paragraphs.length > 0 ? (okCount / paragraphs.length) * 100 : 0;
+function applyParagraphStatus(
+  id: string,
+  paragraphMap: Map<string, HTMLElement>,
+  gazeMap: Map<string, GazeData>,
+  statusMap: Map<string, GazeStatus>,
+  updateOkCount: (delta: number) => void,
+): void {
+  const el = paragraphMap.get(id);
+  if (!el) return;
+
+  const prev = statusMap.get(id) ?? "unseen";
+  const next = classifyStatus(gazeMap.get(id));
+  if (prev === next) return;
+
+  if (prev === "ok") updateOkCount(-1);
+  if (next === "ok") updateOkCount(1);
+
+  statusMap.set(id, next);
+  applyStatusClass(el, next);
+}
+
+function updateProgress(
+  progressBar: HTMLElement,
+  okCount: number,
+  total: number,
+): void {
+  const pct = total > 0 ? (okCount / total) * 100 : 0;
   progressBar.style.width = `${pct.toFixed(0)}%`;
 }
 
