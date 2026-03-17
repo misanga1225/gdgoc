@@ -62,7 +62,10 @@ impl VertexAiClient {
             }],
             "generationConfig": {
                 "temperature": 0.3,
-                "maxOutputTokens": 512
+                "maxOutputTokens": 4096,
+                "thinkingConfig": {
+                    "thinkingBudget": 0
+                }
             }
         });
 
@@ -83,11 +86,15 @@ impl VertexAiClient {
 
         let summary = result
             .pointer("/candidates/0/content/parts/0/text")
-            .and_then(|v| v.as_str())
-            .unwrap_or("要約を生成できませんでした。")
-            .to_string();
+            .and_then(|v| v.as_str());
 
-        Ok(summary)
+        match summary {
+            Some(text) => Ok(text.to_string()),
+            None => {
+                let body = serde_json::to_string(&result).unwrap_or_default();
+                Err(format!("Vertex AI unexpected response: {}", body).into())
+            }
+        }
     }
 }
 
