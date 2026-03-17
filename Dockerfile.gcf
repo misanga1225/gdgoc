@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 COPY ./server /usr/local/bin/server
 RUN chmod +x /usr/local/bin/server
 
-ENV PORT=8080
-EXPOSE 8080
+ENV PORT=8081
+EXPOSE 8081
 
 CMD ["/usr/local/bin/server"]

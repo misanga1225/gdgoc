@@ -1,0 +1,197 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.6;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+}
+
+h1 {
+  font-size: var(--font-size-display);
+}
+
+h2 {
+  font-size: var(--font-size-section-title);
+}
+
+h3 {
+  font-size: var(--font-size-card-title);
+}
+
+button {
+  border: 0;
+  background: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 10px var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  cursor: pointer;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color 0.16s ease, border-color 0.16s ease,
+    color 0.16s ease, opacity 0.16s ease;
+}
+
+.btn:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-brand-primary);
+  color: var(--color-bg-surface);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-primary-hover);
+}
+
+.btn-secondary,
+.btn-outline {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-outline:hover:not(:disabled) {
+  background: var(--color-bg-base);
+}
+
+.btn-sm {
+  min-height: 32px;
+  padding: 8px 14px;
+  font-size: var(--font-size-small);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: var(--color-overlay-default);
+}
+
+.modal-dialog {
+  width: min(100%, 520px);
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-modal);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-modal);
+}
+
+.modal-title {
+  font-size: var(--font-size-section-title);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.modal-description {
+  margin-top: var(--space-3);
+  color: var(--color-text-secondary);
+  white-space: pre-line;
+}
+
+.modal-description-wrap {
+  margin-top: var(--space-3);
+}
+
+.modal-description-centered {
+  text-align: center;
+}
+
+.modal-checklist {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.7;
+}
+
+.modal-checklist-item {
+  text-align: center;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+body.modal-open {
+  overflow: hidden;
+}
