@@ -2,19 +2,30 @@ import "../../shared/styles/tokens.css";
 import "../../shared/styles/base.css";
 import "./styles.css";
 import "./styles/doctor-main.css";
+import "./styles/d01-login.css";
 import { getSession } from "./api";
-import { renderUploadView } from "./upload";
 import { renderMonitorView, cleanupMonitor } from "./monitor";
-import { getSavedSessionIds, addSessionId } from "./sessions";
 import { renderDoctorMainPage } from "./pages/DoctorMainPage";
+import { renderDoctorLoginPage } from "./pages/DoctorLoginPage";
+import { addSessionId, getSavedSessionIds } from "./sessions";
+import { renderUploadView } from "./upload";
 
 const app = document.getElementById("app")!;
 
-/** 現在選択中のセッションID */
 let activeSessionId: string | null = null;
 
-/** メインUIを構築 */
 async function main() {
+  const loginPage = renderDoctorLoginPage({
+    onLoginSuccess: () => {
+      renderDoctorShell().catch(console.error);
+    },
+  });
+
+  app.innerHTML = "";
+  app.append(loginPage);
+}
+
+async function renderDoctorShell() {
   app.innerHTML = `
     <div class="sidebar">
       <div class="sidebar-header">
@@ -60,14 +71,13 @@ async function main() {
   await refreshSessionList();
 }
 
-/** セッション一覧を更新 */
 async function refreshSessionList() {
   const listEl = document.getElementById("session-list")!;
   const mainContent = document.getElementById("main-content")!;
   const ids = getSavedSessionIds();
 
   if (ids.length === 0) {
-    listEl.innerHTML = `<div style="padding:16px;text-align:center;color:#999;font-size:13px;">セッションなし</div>`;
+    listEl.innerHTML = "<div style=\"padding:16px;text-align:center;color:#999;font-size:13px;\">セッションなし</div>";
     return;
   }
 
@@ -78,17 +88,15 @@ async function refreshSessionList() {
     card.className = `session-card${id === activeSessionId ? " active" : ""}`;
     card.dataset.sessionId = id;
 
-    // まず最小限の情報を表示
     card.innerHTML = `
       <div class="name">読み込み中...</div>
       <div class="meta">${id.substring(0, 8)}...</div>
     `;
     listEl.appendChild(card);
 
-    // 非同期でセッション情報を取得
     getSession(id)
       .then((session) => {
-        const name = (session.name as string) || "不明";
+        const name = (session.name as string) || "患者";
         const status = (session.status as string) || "waiting";
         card.innerHTML = `
           <div class="name">${name}</div>
@@ -113,7 +121,6 @@ async function refreshSessionList() {
   }
 }
 
-/** アクティブなカードをハイライト */
 function highlightActive() {
   const cards = document.querySelectorAll(".session-card");
   cards.forEach((card) => {
@@ -126,8 +133,8 @@ function statusLabel(status: string): string {
   const labels: Record<string, string> = {
     waiting: "待機中",
     watching: "閲覧中",
-    reviewed: "仮確認済み",
-    authorized: "同意許可済み",
+    reviewed: "要説明あり",
+    authorized: "許可済み",
     completed: "完了",
   };
   return labels[status] ?? status;

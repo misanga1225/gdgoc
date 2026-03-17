@@ -53,3 +53,7 @@
 ## Review (2026-03-18, common-spec document update)
 - Summary: Updated both `docs/design-system-development-spec.md` and `docs/ui-development-spec.md` to reflect agreed common-spec rules: mandatory `data-variant`/`data-size` for `createButton`, checklist-dot + centered checklist presentation for checklist-bearing modals, required `body.modal-open` background-scroll lock, and default D-05 modal copy ownership in `createEndSessionModal`.
 - Tests: Not run (documentation update only).
+
+## Review (2026-03-18, D-01 login UI implementation)
+- Summary: Added D-01 doctor login UI (`renderDoctorLoginPage`) with required ID/password validation and in-page fixed error messaging, added dedicated `d01-login.css`, and switched doctor app entry so unauthenticated state always starts at D-01 then transitions into the existing shell on success.
+- Tests: `cmd /c npx tsc --noEmit` in `doctor` passed.
