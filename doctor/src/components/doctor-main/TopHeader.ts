@@ -3,15 +3,31 @@ export interface TopHeaderOptions {
   patientChartId: string;
   currentTimeLabel: string;
   patientViewStatusLabel: "閲覧中" | "不在";
+  onBackToD02?: () => void;
 }
 
 export function renderTopHeader(options: TopHeaderOptions): HTMLElement {
   const header = document.createElement("header");
   header.className = "d05-top-header";
 
+  const left = document.createElement("div");
+  left.className = "d05-header-left";
+
+  if (options.onBackToD02) {
+    const backButton = document.createElement("button");
+    backButton.type = "button";
+    backButton.className = "d05-back-button";
+    backButton.textContent = "一覧画面へ戻る";
+    backButton.addEventListener("click", () => {
+      options.onBackToD02?.();
+    });
+    left.append(backButton);
+  }
+
   const brand = document.createElement("div");
   brand.className = "d05-brand";
   brand.textContent = "Aurlum";
+  left.append(brand);
 
   const patientMeta = document.createElement("div");
   patientMeta.className = "d05-patient-meta";
@@ -36,7 +52,7 @@ export function renderTopHeader(options: TopHeaderOptions): HTMLElement {
   status.textContent = options.patientViewStatusLabel;
 
   patientMeta.append(name, chartId, time, status);
-  header.append(brand, patientMeta);
+  header.append(left, patientMeta);
 
   return header;
 }

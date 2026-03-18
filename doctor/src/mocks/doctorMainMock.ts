@@ -21,7 +21,7 @@ export interface AttentionMarker {
 export interface DoctorMainMockData {
   patientName: string;
   patientChartId: string;
-  patientViewStatusLabel: string;
+  patientViewStatusLabel: "閲覧中" | "不在";
   elapsedTimeLabel: string;
   progressPercent: number;
   unviewedSections: UnviewedSection[];
@@ -29,7 +29,7 @@ export interface DoctorMainMockData {
 }
 
 export const doctorMainMockData: DoctorMainMockData = {
-  patientName: "山田 花子",
+  patientName: "田中 太郎",
   patientChartId: "KARTE-20481",
   patientViewStatusLabel: "閲覧中",
   elapsedTimeLabel: "12分",
@@ -79,15 +79,13 @@ export const doctorMainMockData: DoctorMainMockData = {
   ],
 };
 
-// Backward-compatible shape used by existing D-05 mock page.
 export const DOCTOR_MAIN_MOCK = {
   patientName: doctorMainMockData.patientName,
   patientChartId: doctorMainMockData.patientChartId,
-  patientViewStatusLabel:
-    doctorMainMockData.patientViewStatusLabel as "閲覧中" | "不在",
+  patientViewStatusLabel: doctorMainMockData.patientViewStatusLabel,
   elapsedTimeLabel: doctorMainMockData.elapsedTimeLabel,
   progressPercent: doctorMainMockData.progressPercent,
-  unviewedSections: doctorMainMockData.unviewedSections.map((x) => x.title),
+  unviewedSections: doctorMainMockData.unviewedSections.map((item) => item.title),
   attentionMarkers: doctorMainMockData.attentionMarkers,
   documentTitle: SAMPLE_DOCUMENT_TITLE,
   documentHtml: SAMPLE_DOCUMENT_HTML,
