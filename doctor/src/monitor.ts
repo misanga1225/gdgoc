@@ -227,18 +227,18 @@ function renderActions(
 ): void {
   actionsDiv.innerHTML = "";
 
-  // 見落とし分析ボタン（watching or reviewed のとき）
+  // 閲覧状況レポートボタン（watching or reviewed のとき）
   if (status === "watching" || status === "reviewed") {
     const btnSummary = document.createElement("button");
     btnSummary.className = "btn btn-outline btn-sm";
-    btnSummary.textContent = "見落とし分析を再取得";
+    btnSummary.textContent = "閲覧状況レポートを再取得";
     btnSummary.style.marginRight = "8px";
     btnSummary.addEventListener("click", async () => {
       btnSummary.disabled = true;
       btnSummary.textContent = "分析中...";
       await fetchAndDisplayOversight(sessionId, paragraphs, gazeMap, monitorDoc, aiArea);
       btnSummary.disabled = false;
-      btnSummary.textContent = "見落とし分析を再取得";
+      btnSummary.textContent = "閲覧状況レポートを再取得";
     });
     actionsDiv.appendChild(btnSummary);
   }
@@ -276,19 +276,19 @@ function getMissedParagraphs(
   paragraphs: HTMLElement[],
   gazeMap: Map<string, GazeData>,
   _monitorDoc: HTMLElement
-): { id: string; text: string }[] {
-  const missed: { id: string; text: string }[] = [];
+): { id: string; text: string; dwell_time: number }[] {
+  const missed: { id: string; text: string; dwell_time: number }[] = [];
   for (const el of paragraphs) {
     const id = el.dataset.paragraphId!;
     const gaze = gazeMap.get(id);
     if (gaze && gaze.is_reached && gaze.dwell_time < DWELL_THRESHOLD) {
-      missed.push({ id, text: el.textContent?.trim() || "" });
+      missed.push({ id, text: el.textContent?.trim() || "", dwell_time: gaze.dwell_time });
     }
   }
   return missed;
 }
 
-/** 見落とし分析を取得して aiArea に表示する（手動/自動共通） */
+/** 閲覧状況レポートを取得して aiArea に表示する（手動/自動共通） */
 async function fetchAndDisplayOversight(
   sessionId: string,
   paragraphs: HTMLElement[],
@@ -301,31 +301,42 @@ async function fetchAndDisplayOversight(
   if (missed.length === 0) {
     aiArea.innerHTML = `
       <div class="ai-summary" style="border-left:4px solid #34a853;padding:12px 16px;background:#e6f4ea;border-radius:4px;margin:12px 0;">
-        <h3 style="margin:0 0 4px;">見落とし分析</h3>
-        <p style="margin:0;">見落とし箇所はありません。患者は全段落を十分に閲覧しています。</p>
+        <h3 style="margin:0 0 4px;">閲覧状況レポート</h3>
+        <p style="margin:0;">全ての段落が基準時間以上閲覧されています。</p>
       </div>`;
     return;
   }
 
   aiArea.innerHTML = `
     <div class="ai-summary" style="border-left:4px solid #e37400;padding:12px 16px;background:#fef7e0;border-radius:4px;margin:12px 0;">
-      <h3 style="margin:0 0 4px;">見落とし分析中...</h3>
-      <p style="margin:0;">${missed.length}箇所の見落としを検出しました。AIが分析しています...</p>
+      <h3 style="margin:0 0 4px;">閲覧状況レポート作成中...</h3>
+      <p style="margin:0;">${missed.length}箇所が十分に閲覧されなかった可能性があります。AIが整理しています...</p>
     </div>`;
 
   try {
     const { summary } = await summarizeMissed(sessionId, missed);
-    aiArea.innerHTML = `
-      <div class="ai-summary" style="border-left:4px solid #d93025;padding:12px 16px;background:#fce8e6;border-radius:4px;margin:12px 0;">
-        <h3 style="margin:0 0 8px;">見落とし通知 — ${missed.length}箇所</h3>
-        <div style="white-space:pre-wrap;line-height:1.6;">${summary}</div>
-      </div>`;
+    const wrapper = document.createElement("div");
+    wrapper.className = "ai-summary";
+    wrapper.style.cssText = "border-left:4px solid #1a73e8;padding:12px 16px;background:#e8f0fe;border-radius:4px;margin:12px 0;";
+
+    const title = document.createElement("h3");
+    title.style.cssText = "margin:0 0 8px;";
+    title.textContent = `閲覧状況レポート — ${missed.length}箇所`;
+
+    const content = document.createElement("div");
+    content.style.cssText = "white-space:pre-wrap;line-height:1.6;";
+    content.textContent = summary;
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(content);
+    aiArea.innerHTML = "";
+    aiArea.appendChild(wrapper);
   } catch (e) {
-    showToast(`見落とし分析エラー: ${e}`, "error");
+    showToast(`閲覧状況レポートエラー: ${e}`, "error");
     aiArea.innerHTML = `
-      <div class="ai-summary" style="border-left:4px solid #d93025;padding:12px 16px;background:#fce8e6;border-radius:4px;margin:12px 0;">
-        <h3 style="margin:0 0 4px;">見落とし通知</h3>
-        <p style="margin:0;">分析の取得に失敗しました。「見落とし分析を再取得」ボタンで再試行してください。</p>
+      <div class="ai-summary" style="border-left:4px solid #1a73e8;padding:12px 16px;background:#e8f0fe;border-radius:4px;margin:12px 0;">
+        <h3 style="margin:0 0 4px;">閲覧状況レポート</h3>
+        <p style="margin:0;">レポートの取得に失敗しました。「閲覧状況レポートを再取得」ボタンで再試行してください。</p>
       </div>`;
   }
 }
@@ -338,7 +349,7 @@ async function autoNotifyOversight(
   monitorDoc: HTMLElement,
   aiArea: HTMLElement,
 ): Promise<void> {
-  showToast("患者が仮確認を完了しました。見落とし分析を実行中...", "info");
+  showToast("患者が仮確認を完了しました。閲覧状況レポートを作成中...", "info");
   await fetchAndDisplayOversight(sessionId, paragraphs, gazeMap, monitorDoc, aiArea);
 }
 
