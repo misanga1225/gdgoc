@@ -57,3 +57,11 @@
 ## Review (2026-03-18, D-01 login UI implementation)
 - Summary: Added D-01 doctor login UI (`renderDoctorLoginPage`) with required ID/password validation and in-page fixed error messaging, added dedicated `d01-login.css`, and switched doctor app entry so unauthenticated state always starts at D-01 then transitions into the existing shell on success.
 - Tests: `cmd /c npx tsc --noEmit` in `doctor` passed.
+
+## Review (2026-03-18, D-05 backend integration + missed-summary UI)
+- Summary: Wired D-05 to real session data and signed document URLs, added live gaze tracking integration, and updated the update/confirm flows to show Gemini-based missed summaries with missed markers and authorized-status confirmation to the patient.
+- Tests: `cmd /c npx tsc --noEmit` in `doctor` passed.
+
+## Review (2026-03-19, consent flow simplification)
+- Summary: Removed patient-side preliminary confirmation, allowed doctor authorization directly from watching status, added doctor-side completion notifications, and disabled update/confirm actions after consent completion.
+- Tests: `cmd /c npx tsc --noEmit` in `doctor` passed. `cmd /c npx tsc --noEmit` in `patient` passed.

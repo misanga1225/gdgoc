@@ -54,6 +54,12 @@ export async function uploadDocument(sessionId: string, html: string) {
   return resp.json() as Promise<{ document_url: string }>;
 }
 
+/** 患者用フルURLを構築 */
+export function buildPatientFullUrl(patientPath: string): string {
+  const base = import.meta.env.VITE_PATIENT_URL ?? window.location.origin;
+  return `${base}${patientPath}`;
+}
+
 /** 見落とし要約取得 */
 export async function summarizeMissed(
   sessionId: string,

@@ -9,6 +9,8 @@ import { renderDoctorMainPage } from "./pages/DoctorMainPage";
 import { renderSessionHubPage } from "./pages/SessionHubPage";
 import { addSessionId } from "./sessions";
 import { renderUploadView } from "./upload";
+import { buildPatientFullUrl } from "./api";
+import { showPatientUrlDialog } from "./components/session-hub/PatientUrlDialog";
 import { auth } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -20,11 +22,11 @@ const app: HTMLElement = appRoot;
 let loginUserId = "";
 
 async function main(): Promise<void> {
-  // 開発環境ではログインをスキップ
-  if (import.meta.env.DEV) {
-    await renderD02();
-    return;
-  }
+  // 開発環境ではログインをスキップ（ログイン機能テストのため一時無効化）
+  // if (import.meta.env.DEV) {
+  //   await renderD02();
+  //   return;
+  // }
   // 本番: Firebase Authのログイン状態を監視
   onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -112,9 +114,15 @@ function renderD03(
 
   renderUploadView(
     content,
-    (sessionId) => {
+    (sessionId, patientUrl) => {
       addSessionId(sessionId);
-      void renderD02();
+      if (patientUrl) {
+        showPatientUrlDialog(buildPatientFullUrl(patientUrl), () => {
+          void renderD02();
+        });
+      } else {
+        void renderD02();
+      }
     },
     {
       heading: "資料追加",
@@ -128,7 +136,7 @@ function renderD03(
 }
 
 function renderD05(
-  _sessionId: string,
+  sessionId: string,
   patientName: string,
   patientChartId: string
 ): void {
@@ -143,6 +151,7 @@ function renderD05(
     onBackToD02: () => {
       void renderD02();
     },
+    sessionId,
     patientName,
     patientChartId,
   });
