@@ -25,9 +25,8 @@
 
 .d02-left-header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 20px 20px 16px;
   border-bottom: 1px solid var(--color-border-default);
 }
@@ -116,6 +115,32 @@
 .d02-patient-name {
   font-size: 18px;
   font-weight: var(--font-weight-semibold);
+}
+
+.d02-delete-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #999;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.d02-patient-item:hover .d02-delete-btn {
+  opacity: 1;
+}
+
+.d02-delete-btn:hover {
+  background: #fee;
+  color: #d33;
 }
 
 .d02-status-chip {

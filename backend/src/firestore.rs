@@ -137,6 +137,46 @@ impl FirestoreClient {
         Ok(())
     }
 
+    /// サブコレクション内のドキュメントを作成または上書きする
+    pub async fn upsert_subcollection_document(
+        &self,
+        parent_collection: &str,
+        parent_id: &str,
+        sub_collection: &str,
+        document_id: &str,
+        fields: Map<String, Value>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let token = self.get_token().await?;
+        // PATCH with full field mask = upsert
+        let url = format!(
+            "{}/{}/{}/{}/{}",
+            self.base_url, parent_collection, parent_id, sub_collection, document_id
+        );
+
+        let firestore_fields = to_firestore_fields(&fields);
+        let mask_params: String = fields
+            .keys()
+            .map(|k| format!("updateMask.fieldPaths={}", k))
+            .collect::<Vec<_>>()
+            .join("&");
+
+        let body = json!({ "fields": firestore_fields });
+
+        let resp = self
+            .client
+            .patch(&format!("{}?{}", url, mask_params))
+            .bearer_auth(&token)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !resp.status().is_success() {
+            let err = resp.text().await?;
+            return Err(format!("Firestore subcollection upsert failed: {}", err).into());
+        }
+        Ok(())
+    }
+
     /// サブコレクション内の全ドキュメントを取得する
     pub async fn list_documents(
         &self,

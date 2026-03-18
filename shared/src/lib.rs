@@ -19,6 +19,7 @@ impl SessionStatus {
         matches!(
             (self, next),
             (SessionStatus::Waiting, SessionStatus::Watching)
+                | (SessionStatus::Watching, SessionStatus::Authorized)
                 | (SessionStatus::Watching, SessionStatus::Reviewed)
                 | (SessionStatus::Reviewed, SessionStatus::Authorized)
                 | (SessionStatus::Authorized, SessionStatus::Completed)

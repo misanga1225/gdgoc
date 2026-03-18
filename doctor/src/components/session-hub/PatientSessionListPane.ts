@@ -1,8 +1,10 @@
+export type SessionStatusLabel = "未アクセス" | "閲覧中" | "確認待ち" | "同意許可済" | "完了";
+
 export interface PatientSessionRow {
   id: string;
   name: string;
   chartId: string;
-  statusLabel: "閲覧中" | "不在";
+  statusLabel: SessionStatusLabel;
 }
 
 export interface PatientSessionListPaneOptions {
@@ -15,6 +17,7 @@ export interface PatientSessionListPaneOptions {
   onClearSelection: () => void;
   onSelect: (id: string) => void;
   onOpenD05: (id: string) => void;
+  onDelete?: (id: string) => void;
   onLogout?: () => void;
 }
 
@@ -106,7 +109,7 @@ export function renderPatientSessionListPane(
     item.innerHTML = `
       <div class="d02-patient-main">
         <div class="d02-patient-name">${row.name}</div>
-        <span class="d02-status-chip ${row.statusLabel === "閲覧中" ? "is-viewing" : "is-away"}">${row.statusLabel}</span>
+        <span class="d02-status-chip ${row.statusLabel === "閲覧中" ? "is-viewing" : row.statusLabel === "未アクセス" ? "is-away" : "is-done"}">${row.statusLabel}</span>
       </div>
       <div class="d02-patient-meta">ID - ${row.chartId}</div>
     `;
@@ -118,6 +121,19 @@ export function renderPatientSessionListPane(
     item.addEventListener("dblclick", () => {
       options.onOpenD05(row.id);
     });
+
+    if (options.onDelete) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "d02-delete-btn";
+      deleteBtn.textContent = "✕";
+      deleteBtn.title = "削除";
+      deleteBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        options.onDelete!(row.id);
+      });
+      item.querySelector(".d02-patient-main")?.append(deleteBtn);
+    }
 
     list.append(item);
   }

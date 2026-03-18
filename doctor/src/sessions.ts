@@ -18,3 +18,8 @@ export function addSessionId(id: string): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
   }
 }
+
+export function removeSessionId(id: string): void {
+  const ids = getSavedSessionIds().filter((sid) => sid !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+}

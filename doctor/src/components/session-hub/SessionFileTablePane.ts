@@ -8,6 +8,7 @@ export interface SessionFileTablePaneOptions {
   onSelectFile: (fileId: string) => void;
   onOpenFile: (fileId: string) => void;
   onRequestDelete: (fileId: string) => void;
+  onShowPatientUrl?: () => void;
 }
 
 export function renderSessionFileTablePane(
@@ -18,10 +19,39 @@ export function renderSessionFileTablePane(
 
   const header = document.createElement("header");
   header.className = "d02-file-header";
-  header.innerHTML = `
+
+  const headerTop = document.createElement("div");
+  headerTop.style.display = "flex";
+  headerTop.style.alignItems = "center";
+  headerTop.style.justifyContent = "space-between";
+
+  const headerText = document.createElement("div");
+  headerText.innerHTML = `
     <h2 class="d02-file-title">${options.sessionName} のファイル</h2>
     <p class="d02-file-meta">ID - ${options.sessionChartId} ・ ${options.files.length}件のファイル</p>
   `;
+
+  headerTop.append(headerText);
+
+  if (options.onShowPatientUrl && options.files.length > 0) {
+    const urlBtn = document.createElement("button");
+    urlBtn.type = "button";
+    urlBtn.textContent = "患者URL";
+    Object.assign(urlBtn.style, {
+      padding: "6px 14px",
+      borderRadius: "6px",
+      border: "1px solid #2563eb",
+      background: "transparent",
+      color: "#2563eb",
+      fontSize: "12px",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    });
+    urlBtn.addEventListener("click", () => options.onShowPatientUrl!());
+    headerTop.append(urlBtn);
+  }
+
+  header.append(headerTop);
 
   const tableWrap = document.createElement("div");
   tableWrap.className = "d02-file-table-wrap";

@@ -6,15 +6,19 @@ import { createFileDeleteConfirmModal } from "../components/session-hub/FileDele
 import {
   renderPatientSessionListPane,
   type PatientSessionRow,
+  type SessionStatusLabel,
 } from "../components/session-hub/PatientSessionListPane";
 import { renderSessionFileTablePane } from "../components/session-hub/SessionFileTablePane";
 import {
+  clearSessionFilesCache,
   deleteSessionFile,
   ensureSessionFiles,
   type SessionFileItem,
 } from "../state/sessionHubState";
-import { getSavedSessionIds } from "../sessions";
+import { getSavedSessionIds, removeSessionId } from "../sessions";
 import { showToast } from "../toast";
+import { buildPatientFullUrl } from "../api";
+import { showPatientUrlDialog } from "../components/session-hub/PatientUrlDialog";
 
 interface SessionHubRow extends PatientSessionRow {
   sourceUrl?: string;
@@ -39,31 +43,31 @@ const FALLBACK_ROWS: SessionHubRow[] = [
     id: "mock-session-1",
     name: "田中太郎",
     chartId: "441255",
-    statusLabel: "閲覧中",
+    statusLabel: "未アクセス",
   },
   {
     id: "mock-session-2",
     name: "山田聡",
     chartId: "298465",
-    statusLabel: "不在",
+    statusLabel: "未アクセス",
   },
   {
     id: "mock-session-3",
     name: "佐藤花子",
     chartId: "553210",
-    statusLabel: "閲覧中",
+    statusLabel: "未アクセス",
   },
   {
     id: "mock-session-4",
     name: "鈴木一郎",
     chartId: "178923",
-    statusLabel: "不在",
+    statusLabel: "未アクセス",
   },
   {
     id: "mock-session-5",
     name: "高橋美咲",
     chartId: "662847",
-    statusLabel: "閲覧中",
+    statusLabel: "未アクセス",
   },
 ];
 
@@ -71,6 +75,7 @@ export async function renderSessionHubPage(
   container: HTMLElement,
   options: SessionHubPageOptions
 ): Promise<void> {
+  clearSessionFilesCache();
   const rows = await loadSessionRows();
   let allRows = rows.length > 0 ? rows : FALLBACK_ROWS;
   let searchDraft = "";
@@ -112,13 +117,17 @@ export async function renderSessionHubPage(
     return ensureSessionFiles(row.id, row.sourceUrl);
   }
 
-  function openSelectedFile(fileId: string): void {
-    const file = selectedFiles().find((item) => item.id === fileId);
-    if (!file?.sourceUrl) {
-      showToast("この資料はプレビューURLが未設定です", "info");
+  function openSelectedFile(_fileId: string): void {
+    const row = selectedRow();
+    if (!row) {
+      showToast("セッションが選択されていません", "info");
       return;
     }
-    window.open(file.sourceUrl, "_blank", "noopener,noreferrer");
+    options.onOpenD05({
+      sessionId: row.id,
+      name: row.name,
+      chartId: row.chartId,
+    });
   }
 
   function requestDelete(fileId: string): void {
@@ -230,6 +239,19 @@ export async function renderSessionHubPage(
           chartId: target.chartId,
         });
       },
+      onDelete: (id) => {
+        if (!confirm("このセッションを削除しますか？")) {
+          return;
+        }
+        removeSessionId(id);
+        allRows = allRows.filter((row) => row.id !== id);
+        if (selectedSessionId === id) {
+          selectedSessionId = allRows[0]?.id ?? null;
+          selectedFileId = null;
+        }
+        render();
+        showToast("セッションを削除しました", "success");
+      },
     });
 
     const centerPane = renderSessionFileTablePane({
@@ -243,6 +265,12 @@ export async function renderSessionHubPage(
       },
       onOpenFile: openSelectedFile,
       onRequestDelete: requestDelete,
+      onShowPatientUrl: row
+        ? () => {
+            const patientPath = `/patient?session=${row.id}`;
+            showPatientUrlDialog(buildPatientFullUrl(patientPath), () => {});
+          }
+        : undefined,
     });
 
     const rightPane = renderDocumentAddPane({
@@ -269,8 +297,7 @@ async function loadSessionRows(): Promise<SessionHubRow[]> {
         id,
         name: String(session.name ?? "患者"),
         chartId: String(session.patient_id ?? session.patientId ?? id.slice(0, 8)),
-        statusLabel:
-          String(session.status ?? "waiting") === "watching" ? "閲覧中" : "不在",
+        statusLabel: toStatusLabel(String(session.status ?? "waiting")),
         sourceUrl: String(session.document_url ?? ""),
       };
     } catch {
@@ -278,7 +305,7 @@ async function loadSessionRows(): Promise<SessionHubRow[]> {
         id,
         name: "患者",
         chartId: id.slice(0, 8),
-        statusLabel: "不在",
+        statusLabel: "未アクセス",
       };
     }
   });
@@ -291,6 +318,21 @@ function createDraftRow(): SessionHubRow {
     id: `draft-${Date.now()}`,
     name: "新規患者",
     chartId: `TEMP-${Math.floor(Math.random() * 900000 + 100000)}`,
-    statusLabel: "不在",
+    statusLabel: "未アクセス",
   };
+}
+
+function toStatusLabel(status: string): SessionStatusLabel {
+  switch (status) {
+    case "watching":
+      return "閲覧中";
+    case "reviewed":
+      return "確認待ち";
+    case "authorized":
+      return "同意許可済";
+    case "completed":
+      return "完了";
+    default:
+      return "未アクセス";
+  }
 }
