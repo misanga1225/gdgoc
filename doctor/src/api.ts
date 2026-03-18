@@ -43,7 +43,7 @@ export async function uploadDocument(sessionId: string, html: string) {
 /** 見落とし要約取得 */
 export async function summarizeMissed(
   sessionId: string,
-  missedParagraphs: { id: string; text: string }[]
+  missedParagraphs: { id: string; text: string; dwell_time: number }[]
 ) {
   const resp = await fetch(`${API_BASE}/sessions/${sessionId}/summarize-missed`, {
     method: "POST",
