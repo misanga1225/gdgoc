@@ -21,10 +21,10 @@ let loginUserId = "";
 
 async function main(): Promise<void> {
   // 開発環境ではログインをスキップ
-  if (import.meta.env.DEV) {
+  /*if (import.meta.env.DEV) {
     await renderD02();
     return;
-  }
+  }*/
   // 本番: Firebase Authのログイン状態を監視
   onAuthStateChanged(auth, (user) => {
     if (user) {
