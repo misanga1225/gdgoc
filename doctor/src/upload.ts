@@ -7,6 +7,8 @@ export interface UploadViewOptions {
   initialPatientId?: string;
   heading?: string;
   submitLabel?: string;
+  targetSessionId?: string;
+  targetFileId?: string;
 }
 
 function addParagraphIds(html: string): string {
@@ -112,13 +114,24 @@ export function renderUploadView(
     btnUpload.textContent = "送信中...";
 
     try {
-      const { session_id } = await createSession(
-        nameInput.value.trim(),
-        idInput.value.trim()
-      );
-      await uploadDocument(session_id, convertedHtml);
-      showToast("セッションを作成しました", "success");
-      onSessionCreated(session_id);
+      let destinationSessionId = options?.targetSessionId;
+      if (!destinationSessionId) {
+        const { session_id } = await createSession(
+          nameInput.value.trim(),
+          idInput.value.trim()
+        );
+        destinationSessionId = session_id;
+      }
+
+      await uploadDocument(destinationSessionId, convertedHtml);
+
+      if (options?.targetSessionId) {
+        showToast("選択中のセッションに資料を追加しました", "success");
+      } else {
+        showToast("セッションを作成しました", "success");
+      }
+
+      onSessionCreated(destinationSessionId);
     } catch (error) {
       showToast(`エラー: ${error}`, "error");
       btnUpload.disabled = false;

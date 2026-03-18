@@ -42,13 +42,28 @@ async function renderD02(): Promise<void> {
     onOpenD05: ({ sessionId, name, chartId }) => {
       renderD05(sessionId, name, chartId);
     },
-    onOpenD03: ({ initialName, initialPatientId }) => {
-      renderD03(initialName, initialPatientId);
+    onOpenD03: ({
+      initialName,
+      initialPatientId,
+      selectedSessionId,
+      selectedFileId,
+    }) => {
+      renderD03(
+        initialName,
+        initialPatientId,
+        selectedSessionId,
+        selectedFileId
+      );
     },
   });
 }
 
-function renderD03(initialName: string, initialPatientId: string): void {
+function renderD03(
+  initialName: string,
+  initialPatientId: string,
+  selectedSessionId: string | null,
+  selectedFileId: string | null
+): void {
   app.className = "app-root app-root--d03";
   app.innerHTML = "";
 
@@ -89,6 +104,8 @@ function renderD03(initialName: string, initialPatientId: string): void {
       submitLabel: "アップロードしてURLを発行",
       initialName,
       initialPatientId,
+      targetSessionId: selectedSessionId ?? undefined,
+      targetFileId: selectedFileId ?? undefined,
     }
   );
 }

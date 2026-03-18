@@ -260,28 +260,28 @@ async function loadSessionRows(): Promise<SessionHubRow[]> {
     return [];
   }
 
-  const rows: SessionHubRow[] = [];
-  for (const id of ids) {
+  const tasks = ids.map(async (id): Promise<SessionHubRow> => {
     try {
       const session = await getSession(id);
-      rows.push({
+      return {
         id,
         name: String(session.name ?? "患者"),
         chartId: String(session.patient_id ?? session.patientId ?? id.slice(0, 8)),
         statusLabel:
           String(session.status ?? "waiting") === "watching" ? "閲覧中" : "不在",
         sourceUrl: String(session.document_url ?? ""),
-      });
+      };
     } catch {
-      rows.push({
+      return {
         id,
         name: "患者",
         chartId: id.slice(0, 8),
         statusLabel: "不在",
-      });
+      };
     }
-  }
-  return rows;
+  });
+
+  return Promise.all(tasks);
 }
 
 function createDraftRow(): SessionHubRow {
