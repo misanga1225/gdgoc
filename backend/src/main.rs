@@ -1,8 +1,10 @@
+mod auth;
 mod firestore;
 mod kms;
 mod storage;
 mod vertex_ai;
 
+use auth::{AuthenticatedDoctor, CertsCache};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -19,7 +21,7 @@ use shared::{
     compute_hash_chain, hash_document, CreateSessionRequest, GazeEntry, Session, SessionStatus,
     UpdateStatusRequest,
 };
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use storage::StorageClient;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
@@ -39,6 +41,7 @@ async fn health() -> Json<Value> {
 
 /// POST /sessions — セッション作成
 async fn create_session(
+    _doctor: AuthenticatedDoctor,
     State(state): State<AppState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> impl IntoResponse {
@@ -204,6 +207,7 @@ struct UploadDocumentRequest {
 
 /// POST /documents/upload — HTML文書をCloud Storageにアップロード
 async fn upload_document(
+    _doctor: AuthenticatedDoctor,
     State(state): State<AppState>,
     Json(req): Json<UploadDocumentRequest>,
 ) -> impl IntoResponse {
@@ -265,6 +269,7 @@ struct SummarizeMissedRequest {
 
 /// POST /sessions/:id/summarize-missed — 見落とし段落をAIで要約
 async fn summarize_missed(
+    _doctor: AuthenticatedDoctor,
     State(state): State<AppState>,
     Path(session_id): Path<String>,
     Json(req): Json<SummarizeMissedRequest>,
@@ -498,6 +503,9 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let project_id_ext = Arc::new(project_id.clone());
+    let certs_cache = CertsCache::new();
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/sessions", post(create_session))
@@ -510,6 +518,8 @@ async fn main() {
         )
         .route("/sessions/{id}/finalize", post(finalize_session))
         .with_state(state)
+        .layer(axum::Extension(project_id_ext))
+        .layer(axum::Extension(certs_cache))
         .layer(cors);
 
     let port: u16 = std::env::var("PORT")
