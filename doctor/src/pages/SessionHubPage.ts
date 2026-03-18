@@ -31,6 +31,7 @@ export interface SessionHubPageOptions {
   loginUserId: string;
   onOpenD05: (session: { sessionId: string; name: string; chartId: string }) => void;
   onOpenD03: (payload: OpenD03Payload) => void;
+  onLogout?: () => void;
 }
 
 const FALLBACK_ROWS: SessionHubRow[] = [
@@ -196,6 +197,7 @@ export async function renderSessionHubPage(
       rows: rowsToDisplay,
       selectedId: selectedSessionId,
       loginLabel: `ログイン: ${options.loginUserId}`,
+      onLogout: options.onLogout,
       searchDraft,
       onSearchDraftChange: (next) => {
         searchDraft = next;
