@@ -1,143 +1,117 @@
 import "../../shared/styles/tokens.css";
 import "../../shared/styles/base.css";
 import "./styles.css";
-import "./styles/doctor-main.css";
 import "./styles/d01-login.css";
-import { getSession } from "./api";
-import { renderMonitorView, cleanupMonitor } from "./monitor";
-import { renderDoctorMainPage } from "./pages/DoctorMainPage";
+import "./styles/d02-session-hub.css";
+import "./styles/doctor-main.css";
 import { renderDoctorLoginPage } from "./pages/DoctorLoginPage";
-import { addSessionId, getSavedSessionIds } from "./sessions";
+import { renderDoctorMainPage } from "./pages/DoctorMainPage";
+import { renderSessionHubPage } from "./pages/SessionHubPage";
+import { addSessionId } from "./sessions";
 import { renderUploadView } from "./upload";
 
-const app = document.getElementById("app")!;
+const appRoot = document.getElementById("app");
+if (!appRoot) {
+  throw new Error("#app が見つかりません");
+}
+const app: HTMLElement = appRoot;
+let loginUserId = "";
 
-let activeSessionId: string | null = null;
+async function main(): Promise<void> {
+  renderLogin();
+}
 
-async function main() {
-  const loginPage = renderDoctorLoginPage({
-    onLoginSuccess: () => {
-      renderDoctorShell().catch(console.error);
+function renderLogin(): void {
+  const login = renderDoctorLoginPage({
+    onLoginSuccess: ({ userId }) => {
+      loginUserId = userId;
+      void renderD02();
     },
   });
 
+  app.className = "app-root app-root--login";
   app.innerHTML = "";
-  app.append(loginPage);
+  app.append(login);
 }
 
-async function renderDoctorShell() {
-  app.innerHTML = `
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <h1>Aurlum</h1>
-        <div class="sidebar-actions">
-          <button class="btn btn-secondary btn-sm" id="btn-d05-mock">D-05</button>
-          <button class="btn btn-primary btn-sm" id="btn-new">新規作成</button>
-        </div>
-      </div>
-      <div class="sidebar-list" id="session-list"></div>
-    </div>
-    <div class="main-content" id="main-content">
-      <div class="empty-state"><p>左のセッション一覧から選択するか、新規作成してください</p></div>
-    </div>
-  `;
+async function renderD02(): Promise<void> {
+  app.className = "app-root app-root--d02";
+  app.innerHTML = "";
+  await renderSessionHubPage(app, {
+    loginUserId,
+    onOpenD05: ({ sessionId, name, chartId }) => {
+      renderD05(sessionId, name, chartId);
+    },
+    onOpenD03: ({ initialName, initialPatientId }) => {
+      renderD03(initialName, initialPatientId);
+    },
+  });
+}
 
-  const btnNew = document.getElementById("btn-new")!;
-  const btnD05Mock = document.getElementById("btn-d05-mock")!;
-  const mainContent = document.getElementById("main-content")!;
+function renderD03(initialName: string, initialPatientId: string): void {
+  app.className = "app-root app-root--d03";
+  app.innerHTML = "";
 
-  btnD05Mock.addEventListener("click", () => {
-    activeSessionId = null;
-    cleanupMonitor();
-    highlightActive();
-    mainContent.classList.add("main-content--d05");
-    renderDoctorMainPage(mainContent);
+  const wrapper = document.createElement("section");
+  wrapper.className = "d03-page";
+
+  const header = document.createElement("header");
+  header.className = "d03-header";
+
+  const backButton = document.createElement("button");
+  backButton.type = "button";
+  backButton.className = "btn btn-secondary btn-sm";
+  backButton.textContent = "一覧画面へ戻る";
+  backButton.addEventListener("click", () => {
+    void renderD02();
   });
 
-  btnNew.addEventListener("click", () => {
-    activeSessionId = null;
-    cleanupMonitor();
-    highlightActive();
-    mainContent.classList.remove("main-content--d05");
-    renderUploadView(mainContent, (sessionId) => {
+  const title = document.createElement("h2");
+  title.className = "d03-title";
+  title.textContent = "資料追加・URL発行";
+
+  header.append(backButton, title);
+
+  const content = document.createElement("div");
+  content.className = "d03-content";
+
+  wrapper.append(header, content);
+  app.append(wrapper);
+
+  renderUploadView(
+    content,
+    (sessionId) => {
       addSessionId(sessionId);
-      activeSessionId = sessionId;
-      refreshSessionList();
-      mainContent.classList.remove("main-content--d05");
-      renderMonitorView(mainContent, sessionId);
-    });
-  });
-
-  await refreshSessionList();
+      void renderD02();
+    },
+    {
+      heading: "資料追加",
+      submitLabel: "アップロードしてURLを発行",
+      initialName,
+      initialPatientId,
+    }
+  );
 }
 
-async function refreshSessionList() {
-  const listEl = document.getElementById("session-list")!;
-  const mainContent = document.getElementById("main-content")!;
-  const ids = getSavedSessionIds();
+function renderD05(
+  _sessionId: string,
+  patientName: string,
+  patientChartId: string
+): void {
+  app.className = "app-root app-root--d05";
+  app.innerHTML = "";
 
-  if (ids.length === 0) {
-    listEl.innerHTML = "<div style=\"padding:16px;text-align:center;color:#999;font-size:13px;\">セッションなし</div>";
-    return;
-  }
+  const container = document.createElement("div");
+  container.className = "d05-root";
+  app.append(container);
 
-  listEl.innerHTML = "";
-
-  for (const id of ids) {
-    const card = document.createElement("div");
-    card.className = `session-card${id === activeSessionId ? " active" : ""}`;
-    card.dataset.sessionId = id;
-
-    card.innerHTML = `
-      <div class="name">読み込み中...</div>
-      <div class="meta">${id.substring(0, 8)}...</div>
-    `;
-    listEl.appendChild(card);
-
-    getSession(id)
-      .then((session) => {
-        const name = (session.name as string) || "患者";
-        const status = (session.status as string) || "waiting";
-        card.innerHTML = `
-          <div class="name">${name}</div>
-          <div class="meta">${id.substring(0, 8)}...</div>
-          <span class="status-badge ${status}">${statusLabel(status)}</span>
-        `;
-      })
-      .catch(() => {
-        card.innerHTML = `
-          <div class="name" style="color:#999;">取得エラー</div>
-          <div class="meta">${id.substring(0, 8)}...</div>
-        `;
-      });
-
-    card.addEventListener("click", () => {
-      activeSessionId = id;
-      cleanupMonitor();
-      highlightActive();
-      mainContent.classList.remove("main-content--d05");
-      renderMonitorView(mainContent, id);
-    });
-  }
-}
-
-function highlightActive() {
-  const cards = document.querySelectorAll(".session-card");
-  cards.forEach((card) => {
-    const el = card as HTMLElement;
-    el.classList.toggle("active", el.dataset.sessionId === activeSessionId);
+  renderDoctorMainPage(container, {
+    onBackToD02: () => {
+      void renderD02();
+    },
+    patientName,
+    patientChartId,
   });
 }
 
-function statusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    waiting: "待機中",
-    watching: "閲覧中",
-    reviewed: "要説明あり",
-    authorized: "許可済み",
-    completed: "完了",
-  };
-  return labels[status] ?? status;
-}
-
-main().catch(console.error);
+void main();

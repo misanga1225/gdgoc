@@ -22,7 +22,7 @@ export function renderViewingStatusPanel(
   if (!options.hasFetchedResult) {
     const empty = document.createElement("p");
     empty.className = "d05-status-empty";
-    empty.textContent = "更新ボタンを押すと閲覧状況を確認できます";
+    empty.textContent = "更新ボタンを押すと閲覧状況を確認できます。";
     panel.append(empty);
     return panel;
   }

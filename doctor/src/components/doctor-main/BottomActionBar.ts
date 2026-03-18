@@ -21,6 +21,7 @@ export function renderBottomActionBar(
   const endButton = createButton({
     label: "説明終了の同意確認へ",
     variant: "secondary",
+    className: "d05-end-session-button",
     disabled: options.isUpdating,
     onClick: () => {
       options.onEndSessionClick();
