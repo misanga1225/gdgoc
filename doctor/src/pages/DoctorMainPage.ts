@@ -13,7 +13,16 @@ import {
   type DoctorMainState,
 } from "../state/doctorMainState";
 
-export function renderDoctorMainPage(container: HTMLElement): void {
+export interface DoctorMainPageOptions {
+  onBackToD02?: () => void;
+  patientName?: string;
+  patientChartId?: string;
+}
+
+export function renderDoctorMainPage(
+  container: HTMLElement,
+  options?: DoctorMainPageOptions
+): void {
   let state = createInitialDoctorMainState();
   let modal: ModalController | null = null;
   let currentTimeLabel = formatCurrentTime();
@@ -96,11 +105,11 @@ export function renderDoctorMainPage(container: HTMLElement): void {
     page.className = "d05-page";
 
     const header = renderTopHeader({
-      patientName: doctorMainMockData.patientName,
-      patientChartId: doctorMainMockData.patientChartId,
+      patientName: options?.patientName ?? doctorMainMockData.patientName,
+      patientChartId: options?.patientChartId ?? doctorMainMockData.patientChartId,
       currentTimeLabel,
-      patientViewStatusLabel:
-        doctorMainMockData.patientViewStatusLabel as "閲覧中" | "不在",
+      patientViewStatusLabel: doctorMainMockData.patientViewStatusLabel as "閲覧中" | "不在",
+      onBackToD02: options?.onBackToD02,
     });
 
     const actionBar = renderBottomActionBar({

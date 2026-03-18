@@ -42,8 +42,7 @@ export function createModal(options: ModalOptions): ModalController {
   title.id = titleId;
   title.textContent = options.title;
 
-  const descriptionId =
-    `modal-description-${Math.random().toString(36).slice(2, 10)}`;
+  const descriptionId = `modal-description-${Math.random().toString(36).slice(2, 10)}`;
   const descriptionWrap = document.createElement("div");
   descriptionWrap.className = "modal-description-wrap";
   descriptionWrap.id = descriptionId;
@@ -52,14 +51,15 @@ export function createModal(options: ModalOptions): ModalController {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+
   const checklist = lines.filter((line) => line.startsWith("・"));
   const intro = lines.filter((line) => !line.startsWith("・"));
 
   for (const line of intro) {
-    const p = document.createElement("p");
-    p.className = "modal-description modal-description-centered";
-    p.textContent = line;
-    descriptionWrap.append(p);
+    const paragraph = document.createElement("p");
+    paragraph.className = "modal-description modal-description-centered";
+    paragraph.textContent = line;
+    descriptionWrap.append(paragraph);
   }
 
   if (checklist.length > 0) {
@@ -112,9 +112,10 @@ export function createModal(options: ModalOptions): ModalController {
       document.body.append(overlay);
     }
 
-    previouslyFocusedElement = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
 
     overlay.hidden = false;
     document.body.classList.add("modal-open");
