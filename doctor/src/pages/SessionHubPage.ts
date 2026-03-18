@@ -25,6 +25,7 @@ export interface OpenD03Payload {
   initialPatientId: string;
   selectedSessionId: string | null;
   selectedFileId: string | null;
+  selectedFileName?: string;
 }
 
 export interface SessionHubPageOptions {
@@ -150,25 +151,25 @@ export async function renderSessionHubPage(
   function openD03(): void {
     const row = selectedRow();
     if (row) {
+      const selectedFileName =
+        selectedFiles().find((file) => file.id === selectedFileId)?.name ??
+        undefined;
       options.onOpenD03({
         initialName: row.name,
         initialPatientId: row.chartId,
         selectedSessionId: row.id,
         selectedFileId,
+        selectedFileName,
       });
       return;
     }
 
-    const draft = createDraftRow();
-    allRows = [draft, ...allRows];
-    selectedSessionId = draft.id;
-    selectedFileId = null;
-
     options.onOpenD03({
-      initialName: draft.name,
-      initialPatientId: draft.chartId,
-      selectedSessionId: draft.id,
+      initialName: "",
+      initialPatientId: "",
+      selectedSessionId: null,
       selectedFileId: null,
+      selectedFileName: undefined,
     });
   }
 
@@ -282,13 +283,4 @@ async function loadSessionRows(): Promise<SessionHubRow[]> {
   });
 
   return Promise.all(tasks);
-}
-
-function createDraftRow(): SessionHubRow {
-  return {
-    id: `draft-${Date.now()}`,
-    name: "新規患者",
-    chartId: `TEMP-${Math.floor(Math.random() * 900000 + 100000)}`,
-    statusLabel: "不在",
-  };
 }

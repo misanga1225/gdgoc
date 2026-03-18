@@ -79,6 +79,24 @@
   color: var(--color-text-primary);
 }
 
+.d03-back-button {
+  border-color: #b8e6d7;
+  background: var(--color-brand-soft);
+  color: var(--color-brand-primary);
+}
+
+.d03-back-button:hover:not(:disabled) {
+  background: #dff8ed;
+  border-color: #9edbc7;
+  color: #0b5d56;
+}
+
+.d03-back-button:active:not(:disabled) {
+  background: #d4f3e6;
+  border-color: #8fd1bc;
+  color: #0a4f49;
+}
+
 .d03-content {
   overflow-y: auto;
   padding: var(--space-5);

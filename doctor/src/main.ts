@@ -47,12 +47,14 @@ async function renderD02(): Promise<void> {
       initialPatientId,
       selectedSessionId,
       selectedFileId,
+      selectedFileName,
     }) => {
       renderD03(
         initialName,
         initialPatientId,
         selectedSessionId,
-        selectedFileId
+        selectedFileId,
+        selectedFileName
       );
     },
   });
@@ -62,7 +64,8 @@ function renderD03(
   initialName: string,
   initialPatientId: string,
   selectedSessionId: string | null,
-  selectedFileId: string | null
+  selectedFileId: string | null,
+  selectedFileName?: string
 ): void {
   app.className = "app-root app-root--d03";
   app.innerHTML = "";
@@ -75,7 +78,7 @@ function renderD03(
 
   const backButton = document.createElement("button");
   backButton.type = "button";
-  backButton.className = "btn btn-secondary btn-sm";
+  backButton.className = "btn btn-secondary btn-sm d03-back-button";
   backButton.textContent = "一覧画面へ戻る";
   backButton.addEventListener("click", () => {
     void renderD02();
@@ -106,6 +109,7 @@ function renderD03(
       initialPatientId,
       targetSessionId: selectedSessionId ?? undefined,
       targetFileId: selectedFileId ?? undefined,
+      targetFileName: selectedFileName,
     }
   );
 }

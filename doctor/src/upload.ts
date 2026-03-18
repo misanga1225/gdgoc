@@ -9,6 +9,7 @@ export interface UploadViewOptions {
   submitLabel?: string;
   targetSessionId?: string;
   targetFileId?: string;
+  targetFileName?: string;
 }
 
 function addParagraphIds(html: string): string {
@@ -33,10 +34,17 @@ export function renderUploadView(
   let convertedHtml = "";
   const heading = options?.heading ?? "資料アップロード";
   const submitLabel = options?.submitLabel ?? "アップロードしてセッション作成";
+  const isSessionLocked = Boolean(options?.targetSessionId);
+  const selectedFileLabel = options?.targetFileName ?? options?.targetFileId;
 
   container.innerHTML = `
     <div class="upload-form">
       <h2>${heading}</h2>
+      ${
+        selectedFileLabel
+          ? `<div id="selected-file-info" style="margin-bottom:12px; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f8fafc; font-size:13px; color:#334155;">現在選択中のファイル: ${selectedFileLabel}</div>`
+          : ""
+      }
       <div class="form-group">
         <label for="patient-name">患者名</label>
         <input type="text" id="patient-name" placeholder="例: 田中 太郎" />
@@ -70,13 +78,17 @@ export function renderUploadView(
   if (options?.initialPatientId) {
     idInput.value = options.initialPatientId;
   }
+  if (isSessionLocked) {
+    nameInput.readOnly = true;
+    idInput.readOnly = true;
+  }
 
   function updateButtonDisabled(): void {
-    btnUpload.disabled = !(
-      convertedHtml &&
-      nameInput.value.trim() &&
-      idInput.value.trim()
-    );
+    if (isSessionLocked) {
+      btnUpload.disabled = !convertedHtml;
+      return;
+    }
+    btnUpload.disabled = !(convertedHtml && nameInput.value.trim() && idInput.value.trim());
   }
 
   nameInput.addEventListener("input", updateButtonDisabled);
