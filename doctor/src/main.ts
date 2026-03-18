@@ -9,6 +9,8 @@ import { renderDoctorMainPage } from "./pages/DoctorMainPage";
 import { renderSessionHubPage } from "./pages/SessionHubPage";
 import { addSessionId } from "./sessions";
 import { renderUploadView } from "./upload";
+import { auth } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const appRoot = document.getElementById("app");
 if (!appRoot) {
@@ -18,7 +20,20 @@ const app: HTMLElement = appRoot;
 let loginUserId = "";
 
 async function main(): Promise<void> {
-  renderLogin();
+  // 開発環境ではログインをスキップ
+  if (import.meta.env.DEV) {
+    await renderD02();
+    return;
+  }
+  // 本番: Firebase Authのログイン状態を監視
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      loginUserId = user.uid;
+      void renderD02();
+    } else {
+      renderLogin();
+    }
+  });
 }
 
 function renderLogin(): void {
@@ -37,8 +52,10 @@ function renderLogin(): void {
 async function renderD02(): Promise<void> {
   app.className = "app-root app-root--d02";
   app.innerHTML = "";
+
   await renderSessionHubPage(app, {
     loginUserId,
+    onLogout: () => void signOut(auth),
     onOpenD05: ({ sessionId, name, chartId }) => {
       renderD05(sessionId, name, chartId);
     },

@@ -15,6 +15,7 @@ export interface PatientSessionListPaneOptions {
   onClearSelection: () => void;
   onSelect: (id: string) => void;
   onOpenD05: (id: string) => void;
+  onLogout?: () => void;
 }
 
 export function renderPatientSessionListPane(
@@ -121,7 +122,18 @@ export function renderPatientSessionListPane(
     list.append(item);
   }
 
-  header.append(title, loginMeta);
+  if (options.onLogout) {
+    const loginRow = document.createElement("div");
+    loginRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:4px;";
+    const logoutBtn = document.createElement("button");
+    logoutBtn.className = "btn btn-secondary btn-sm";
+    logoutBtn.textContent = "ログアウト";
+    logoutBtn.addEventListener("click", options.onLogout);
+    loginRow.append(loginMeta, logoutBtn);
+    header.append(title, loginRow);
+  } else {
+    header.append(title, loginMeta);
+  }
   pane.append(header, searchForm, list);
   return pane;
 }

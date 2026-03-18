@@ -1,4 +1,6 @@
 import { createButton } from "../../../shared/components/Button";
+import { auth } from "../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export interface DoctorLoginPageOptions {
   onLoginSuccess: (payload: { userId: string; password: string }) => void;
@@ -66,7 +68,19 @@ export function renderDoctorLoginPage(
     }
 
     error.hidden = true;
-    options.onLoginSuccess({ userId, password });
+    submit.disabled = true;
+    submit.textContent = "ログイン中...";
+
+    signInWithEmailAndPassword(auth, userId, password)
+      .then((credential) => {
+        options.onLoginSuccess({ userId: credential.user.uid, password });
+      })
+      .catch(() => {
+        error.textContent = "ユーザーIDまたはパスワードが正しくありません。";
+        error.hidden = false;
+        submit.disabled = false;
+        submit.textContent = "ログイン";
+      });
   });
 
   userIdGroup.append(userIdInput);
