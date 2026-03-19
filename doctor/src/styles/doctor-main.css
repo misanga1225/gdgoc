@@ -53,6 +53,25 @@
   color: #0a4f49;
 }
 
+.d03-back-button {
+  border: 1px solid #b8e6d7;
+  border-radius: var(--radius-button);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-primary);
+}
+
+.d03-back-button:hover {
+  background: #dff8ed;
+  border-color: #9edbc7;
+  color: #0b5d56;
+}
+
+.d03-back-button:active {
+  background: #d4f3e6;
+  border-color: #8fd1bc;
+  color: #0a4f49;
+}
+
 .d05-brand {
   font-size: var(--font-size-card-title);
   font-weight: var(--font-weight-semibold);

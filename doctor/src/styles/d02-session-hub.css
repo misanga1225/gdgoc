@@ -148,6 +148,7 @@
   padding: 2px 10px;
   font-size: 13px;
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .d02-status-chip.is-viewing {
@@ -161,9 +162,17 @@
 }
 
 .d02-patient-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   color: var(--color-text-secondary);
   margin-top: var(--space-1);
   font-size: 14px;
+}
+
+.d02-patient-id {
+  min-width: 0;
 }
 
 .d02-empty-text {
@@ -247,9 +256,16 @@
 }
 
 .d02-file-type-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
 }
 
 .d02-file-type-icon svg {
@@ -257,20 +273,8 @@
   height: 100%;
 }
 
-.d02-file-type-icon.is-pdf {
-  color: #ef4444;
-}
-
-.d02-file-type-icon.is-word {
-  color: #3b82f6;
-}
-
-.d02-file-type-icon.is-excel {
-  color: #22c55e;
-}
-
-.d02-file-type-icon.is-generic {
-  color: #6b7280;
+.d02-file-type-icon:hover {
+  background: #eef2ff;
 }
 
 .d02-file-name-text {
@@ -278,25 +282,63 @@
 }
 
 .d02-col-action {
-  width: 90px;
+  width: 64px;
 }
 
 .d02-file-action-cell {
   text-align: right;
+  white-space: nowrap;
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
 }
 
+.d02-file-url-badge,
 .d02-file-delete-button {
-  padding: 6px 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-button);
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.d02-file-url-badge {
+  min-width: 38px;
+  width: auto;
+  padding: 0 8px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.d02-file-delete-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.d02-file-delete-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff7f7;
 }
 
 .d02-file-delete-button:hover {
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+.d02-file-url-badge:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .d02-file-empty-row td {
@@ -313,6 +355,14 @@
 .d02-upload-header {
   padding: 20px;
   border-bottom: 1px solid var(--color-border-default);
+}
+
+.d02-upload-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .d02-add-document-button {
@@ -358,4 +408,8 @@
 .d02-add-document-subtitle {
   font-size: 15px;
   color: var(--color-text-secondary);
+}
+
+.d02-logout-button:hover {
+  color: #b91c1c;
 }

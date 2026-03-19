@@ -110,7 +110,7 @@ function renderD03(
 
   const backButton = document.createElement("button");
   backButton.type = "button";
-  backButton.className = "btn btn-secondary btn-sm";
+  backButton.className = "btn btn-secondary btn-sm d03-back-button";
   backButton.textContent = "一覧画面へ戻る";
   backButton.addEventListener("click", () => {
     void renderD02({
