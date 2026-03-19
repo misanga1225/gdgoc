@@ -15,11 +15,11 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 /** セッション作成 */
-export async function createSession(name: string, patientId: string) {
+export async function createSession(name: string, patientId: string, patientEmail: string) {
   const resp = await fetch(`${API_BASE}/sessions`, {
     method: "POST",
     headers: await getAuthHeaders(),
-    body: JSON.stringify({ name, patient_id: patientId }),
+    body: JSON.stringify({ name, patient_id: patientId, patient_email: patientEmail }),
   });
   if (!resp.ok) throw new Error((await resp.json()).error);
   return resp.json() as Promise<{ session_id: string; patient_url: string }>;

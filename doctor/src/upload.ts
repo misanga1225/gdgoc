@@ -54,6 +54,11 @@ export function renderUploadView(
           ${isExistingSession ? 'readonly style="background:#f3f3f3;color:#888;"' : ""} />
       </div>
       <div class="form-group">
+        <label for="patient-email">患者メールアドレス（本人確認用）</label>
+        <input type="email" id="patient-email" placeholder="例: patient@example.com"
+          ${isExistingSession ? 'readonly style="background:#f3f3f3;color:#888;"' : ""} />
+      </div>
+      <div class="form-group">
         <label for="docx-file">資料ファイル (.docx)</label>
         <input type="file" id="docx-file" accept=".docx" />
       </div>
@@ -67,6 +72,7 @@ export function renderUploadView(
 
   const nameInput = document.getElementById("patient-name") as HTMLInputElement;
   const idInput = document.getElementById("patient-id") as HTMLInputElement;
+  const emailInput = document.getElementById("patient-email") as HTMLInputElement;
   const fileInput = document.getElementById("docx-file") as HTMLInputElement;
   const btnUpload = document.getElementById("btn-upload") as HTMLButtonElement;
   const preview = document.getElementById("upload-preview") as HTMLDivElement;
@@ -86,7 +92,9 @@ export function renderUploadView(
       btnUpload.disabled = !(
         convertedHtml &&
         nameInput.value.trim() &&
-        idInput.value.trim()
+        idInput.value.trim() &&
+        emailInput.value.trim() &&
+        emailInput.validity.valid
       );
     }
   }
@@ -94,6 +102,7 @@ export function renderUploadView(
   if (!isExistingSession) {
     nameInput.addEventListener("input", updateButtonDisabled);
     idInput.addEventListener("input", updateButtonDisabled);
+    emailInput.addEventListener("input", updateButtonDisabled);
   }
 
   fileInput.addEventListener("change", async () => {
@@ -133,7 +142,8 @@ export function renderUploadView(
       // ドキュメントごとに新しいセッション（=新しい署名付きURL）を作成する
       const created = await createSession(
         nameInput.value.trim(),
-        idInput.value.trim()
+        idInput.value.trim(),
+        emailInput.value.trim()
       );
       const destinationSessionId = created.session_id;
       const patientUrl = created.patient_url;
