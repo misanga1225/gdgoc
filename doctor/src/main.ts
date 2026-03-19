@@ -9,6 +9,8 @@ import { renderDoctorMainPage } from "./pages/DoctorMainPage";
 import { renderSessionHubPage } from "./pages/SessionHubPage";
 import { addSessionId } from "./sessions";
 import { renderUploadView } from "./upload";
+import { buildPatientFullUrl } from "./api";
+import { showPatientUrlDialog } from "./components/session-hub/PatientUrlDialog";
 import { auth } from "./firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
@@ -115,9 +117,15 @@ function renderD03(
 
   renderUploadView(
     content,
-    (sessionId) => {
+    (sessionId, patientUrl) => {
       addSessionId(sessionId);
-      void renderD02();
+      if (patientUrl) {
+        showPatientUrlDialog(buildPatientFullUrl(patientUrl), () => {
+          void renderD02();
+        });
+      } else {
+        void renderD02();
+      }
     },
     {
       heading: "資料追加",
@@ -132,7 +140,7 @@ function renderD03(
 }
 
 function renderD05(
-  _sessionId: string,
+  sessionId: string,
   patientName: string,
   patientChartId: string
 ): void {
@@ -147,6 +155,7 @@ function renderD05(
     onBackToD02: () => {
       void renderD02();
     },
+    sessionId,
     patientName,
     patientChartId,
   });

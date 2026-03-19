@@ -1,5 +1,6 @@
 import mammoth from "mammoth";
 import { createSession, uploadDocument } from "./api";
+import { saveDocumentMeta } from "./state/documentMeta";
 import { showToast } from "./toast";
 
 export interface UploadViewOptions {
@@ -28,14 +29,19 @@ function addParagraphIds(html: string): string {
 
 export function renderUploadView(
   container: HTMLElement,
-  onSessionCreated: (sessionId: string) => void,
+  onSessionCreated: (sessionId: string, patientUrl?: string) => void,
   options?: UploadViewOptions
 ): void {
   let convertedHtml = "";
+  let selectedFileName = "";
+  let selectedFileSize = 0;
   const heading = options?.heading ?? "資料アップロード";
   const submitLabel = options?.submitLabel ?? "アップロードしてセッション作成";
   const isSessionLocked = Boolean(options?.targetSessionId);
   const selectedFileLabel = options?.targetFileName ?? options?.targetFileId;
+
+  const isExistingSession =
+    !!options?.targetSessionId && !options.targetSessionId.startsWith("draft-");
 
   container.innerHTML = `
     <div class="upload-form">
@@ -47,11 +53,13 @@ export function renderUploadView(
       }
       <div class="form-group">
         <label for="patient-name">患者名</label>
-        <input type="text" id="patient-name" placeholder="例: 田中 太郎" />
+        <input type="text" id="patient-name" placeholder="例: 田中 太郎"
+          ${isExistingSession ? 'readonly style="background:#f3f3f3;color:#888;"' : ""} />
       </div>
       <div class="form-group">
         <label for="patient-id">カルテID</label>
-        <input type="text" id="patient-id" placeholder="例: P001" />
+        <input type="text" id="patient-id" placeholder="例: P001"
+          ${isExistingSession ? 'readonly style="background:#f3f3f3;color:#888;"' : ""} />
       </div>
       <div class="form-group">
         <label for="docx-file">資料ファイル (.docx)</label>
@@ -89,10 +97,21 @@ export function renderUploadView(
       return;
     }
     btnUpload.disabled = !(convertedHtml && nameInput.value.trim() && idInput.value.trim());
+    if (isExistingSession) {
+      btnUpload.disabled = !convertedHtml;
+    } else {
+      btnUpload.disabled = !(
+        convertedHtml &&
+        nameInput.value.trim() &&
+        idInput.value.trim()
+      );
+    }
   }
 
-  nameInput.addEventListener("input", updateButtonDisabled);
-  idInput.addEventListener("input", updateButtonDisabled);
+  if (!isExistingSession) {
+    nameInput.addEventListener("input", updateButtonDisabled);
+    idInput.addEventListener("input", updateButtonDisabled);
+  }
 
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files?.[0];
@@ -105,6 +124,8 @@ export function renderUploadView(
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.convertToHtml({ arrayBuffer });
       convertedHtml = addParagraphIds(result.value);
+      selectedFileName = file.name;
+      selectedFileSize = file.size;
 
       preview.innerHTML = convertedHtml;
       preview.style.display = "block";
@@ -126,24 +147,25 @@ export function renderUploadView(
     btnUpload.textContent = "送信中...";
 
     try {
-      let destinationSessionId = options?.targetSessionId;
-      if (!destinationSessionId) {
-        const { session_id } = await createSession(
-          nameInput.value.trim(),
-          idInput.value.trim()
-        );
-        destinationSessionId = session_id;
-      }
+      // ドキュメントごとに新しいセッション（=新しい署名付きURL）を作成する
+      const created = await createSession(
+        nameInput.value.trim(),
+        idInput.value.trim()
+      );
+      const destinationSessionId = created.session_id;
+      const patientUrl = created.patient_url;
 
       await uploadDocument(destinationSessionId, convertedHtml);
 
-      if (options?.targetSessionId) {
-        showToast("選択中のセッションに資料を追加しました", "success");
-      } else {
-        showToast("セッションを作成しました", "success");
-      }
+      saveDocumentMeta(destinationSessionId, {
+        fileName: selectedFileName,
+        fileSize: selectedFileSize,
+        uploadedAt: new Date().toISOString(),
+      });
 
-      onSessionCreated(destinationSessionId);
+      showToast("セッションを作成しました", "success");
+
+      onSessionCreated(destinationSessionId, patientUrl);
     } catch (error) {
       showToast(`エラー: ${error}`, "error");
       btnUpload.disabled = false;

@@ -53,7 +53,11 @@ export function renderHtmlDocumentViewer(
     }
 
     for (const marker of options.attentionMarkers) {
-      const target = content.querySelector<HTMLElement>(`#${marker.sectionId}`);
+      const target =
+        content.querySelector<HTMLElement>(`#${marker.sectionId}`) ??
+        content.querySelector<HTMLElement>(
+          `[data-paragraph-id="${marker.sectionId}"]`
+        );
       if (!target) {
         continue;
       }

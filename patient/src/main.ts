@@ -36,9 +36,6 @@ async function main() {
     <div class="status-bar watching" id="status-bar">閲覧中</div>
     <div id="document-container"></div>
     <div class="actions">
-      <button class="btn btn-primary" id="btn-preliminary" disabled>
-        仮確認完了（医師へ送信）
-      </button>
       <button class="btn btn-success" id="btn-final" style="display:none" disabled>
         最終同意
       </button>
@@ -46,7 +43,6 @@ async function main() {
   `;
 
   const statusBar = document.getElementById("status-bar")!;
-  const btnPreliminary = document.getElementById("btn-preliminary") as HTMLButtonElement;
   const btnFinal = document.getElementById("btn-final") as HTMLButtonElement;
   const container = document.getElementById("document-container")!;
 
@@ -112,35 +108,11 @@ async function main() {
 
   gazeProvider.start(paragraphs);
 
-  // 仮確認ボタンを有効化
-  btnPreliminary.disabled = false;
-
-  btnPreliminary.addEventListener("click", async () => {
-    btnPreliminary.disabled = true;
-    btnPreliminary.textContent = "送信中...";
-    try {
-      gazeProvider.stop(); // 最終データをフラッシュしてから status を更新
-      await updateSessionStatus(sessionId, "reviewed");
-      btnPreliminary.textContent = "送信済み - 医師の確認をお待ちください";
-      statusBar.textContent = "医師の確認待ち";
-      statusBar.className = "status-bar reviewed";
-    } catch (e) {
-      console.error("Failed to update status:", e);
-      gazeProvider.start(paragraphs); // status 更新失敗時は追跡を再開
-      gazeProvider.onUpdate(async (gazeData) => {
-        try { await syncGazeData(sessionId, gazeData); } catch {}
-      });
-      btnPreliminary.disabled = false;
-      btnPreliminary.textContent = "仮確認完了（医師へ送信）";
-    }
-  });
-
   // 医師からのステータス変更を監視
   watchSessionStatus(sessionId, (status) => {
     if (status === "authorized") {
       statusBar.textContent = "医師が最終同意を許可しました";
       statusBar.className = "status-bar authorized";
-      btnPreliminary.style.display = "none";
       btnFinal.style.display = "inline-block";
       btnFinal.disabled = false;
     } else if (status === "completed") {

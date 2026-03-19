@@ -101,10 +101,8 @@ async fn get_session(
         }
     };
 
-    // 有効期限・完了済みチェック
-    if let Err(e) = check_session_accessible(&fields) {
-        return e;
-    }
+    // 読み取りは完了済み・期限切れでも許可（データ参照のため）
+    // 変更操作のみ check_session_accessible で制限する
 
     // document_url（オブジェクト名）から署名付きURLを生成
     let obj_name = fields
@@ -192,9 +190,17 @@ async fn update_session_status(
     let mut update_fields = Map::new();
     update_fields.insert("status".to_string(), new_status_str);
 
+    // watching開始時刻を記録（経過時間計算用）
+    let mut mask = vec!["status"];
+    if req.status == SessionStatus::Watching {
+        let now = Utc::now().to_rfc3339();
+        update_fields.insert("watching_since".to_string(), json!(now));
+        mask.push("watching_since");
+    }
+
     match state
         .db
-        .update_document("Patients", &session_id, update_fields, &["status"])
+        .update_document("Patients", &session_id, update_fields, &mask)
         .await
     {
         Ok(()) => (
@@ -276,6 +282,84 @@ async fn upload_document(
             "document_url": document_url,
         })),
     )
+}
+
+/// 視線データ同期リクエスト
+#[derive(Deserialize)]
+struct GazeDataEntry {
+    paragraph_id: String,
+    dwell_time: f64,
+    is_reached: bool,
+}
+
+#[derive(Deserialize)]
+struct SyncGazeRequest {
+    paragraphs: Vec<GazeDataEntry>,
+}
+
+/// POST /sessions/:id/gaze — 患者の視線データをFirestoreに同期
+async fn sync_gaze(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(req): Json<SyncGazeRequest>,
+) -> impl IntoResponse {
+    // セッション存在確認
+    match state.db.get_document("Patients", &session_id).await {
+        Ok(fields) => {
+            if let Err(e) = check_session_accessible(&fields) {
+                return e;
+            }
+        }
+        Err(e) if e.to_string() == "not_found" => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
+    }
+
+    let now = Utc::now().to_rfc3339();
+    let mut errors = Vec::new();
+
+    for entry in &req.paragraphs {
+        let mut fields = Map::new();
+        fields.insert("paragraph_id".to_string(), json!(entry.paragraph_id));
+        fields.insert("dwell_time".to_string(), json!(entry.dwell_time));
+        fields.insert("is_reached".to_string(), json!(entry.is_reached));
+        fields.insert("last_updated".to_string(), json!(&now));
+
+        if let Err(e) = state
+            .db
+            .upsert_subcollection_document(
+                "Patients",
+                &session_id,
+                "LiveGaze",
+                &entry.paragraph_id,
+                fields,
+            )
+            .await
+        {
+            errors.push(format!("{}: {}", entry.paragraph_id, e));
+        }
+    }
+
+    if errors.is_empty() {
+        (
+            StatusCode::OK,
+            Json(json!({ "synced": req.paragraphs.len() })),
+        )
+    } else {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("partial failure: {}", errors.join(", ")) })),
+        )
+    }
 }
 
 /// 見落とし要約リクエスト
@@ -578,6 +662,7 @@ async fn main() {
         .route("/sessions/{id}", get(get_session))
         .route("/sessions/{id}/status", patch(update_session_status))
         .route("/documents/upload", post(upload_document))
+        .route("/sessions/{id}/gaze", post(sync_gaze))
         .route(
             "/sessions/{id}/summarize-missed",
             post(summarize_missed),

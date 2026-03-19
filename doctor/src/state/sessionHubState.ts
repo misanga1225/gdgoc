@@ -1,3 +1,5 @@
+import { getDocumentMeta } from "./documentMeta";
+
 export interface SessionFileItem {
   id: string;
   name: string;
@@ -9,32 +11,23 @@ export interface SessionFileItem {
 
 const sessionFilesMap = new Map<string, SessionFileItem[]>();
 
-const MOCK_FILES: Omit<SessionFileItem, "id" | "sourceUrl">[] = [
-  {
-    name: "処方薬について",
-    updatedAt: "2026/03/18 20:15",
-    kind: "PDFファイル",
-    size: "43MB",
-  },
-  {
-    name: "家庭でのケアについて",
-    updatedAt: "2026/03/16 20:15",
-    kind: "Wordファイル",
-    size: "29MB",
-  },
-  {
-    name: "検査結果レポート",
-    updatedAt: "2026/03/14 10:30",
-    kind: "PDFファイル",
-    size: "12MB",
-  },
-  {
-    name: "リハビリ計画書",
-    updatedAt: "2026/03/10 14:00",
-    kind: "Excelファイル",
-    size: "8MB",
-  },
-];
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** D02再描画時にキャッシュをクリアし、最新データを反映させる */
+export function clearSessionFilesCache(): void {
+  sessionFilesMap.clear();
+}
 
 export function ensureSessionFiles(
   sessionId: string,
@@ -45,14 +38,33 @@ export function ensureSessionFiles(
     return existing;
   }
 
-  const seeded = MOCK_FILES.map((item, index) => ({
-    ...item,
-    id: `${sessionId}-file-${index + 1}`,
-    sourceUrl: index === 0 ? sourceUrl : undefined,
-  }));
+  if (!sourceUrl) {
+    sessionFilesMap.set(sessionId, []);
+    return [];
+  }
 
-  sessionFilesMap.set(sessionId, seeded);
-  return seeded;
+  const meta = getDocumentMeta(sessionId);
+  const file: SessionFileItem = meta
+    ? {
+        id: `${sessionId}-file-1`,
+        name: meta.fileName.replace(/\.docx$/i, ""),
+        updatedAt: formatTimestamp(meta.uploadedAt),
+        kind: "HTMLファイル",
+        size: formatBytes(meta.fileSize),
+        sourceUrl,
+      }
+    : {
+        id: `${sessionId}-file-1`,
+        name: "同意書",
+        updatedAt: "-",
+        kind: "HTMLファイル",
+        size: "-",
+        sourceUrl,
+      };
+
+  const files = [file];
+  sessionFilesMap.set(sessionId, files);
+  return files;
 }
 
 export function deleteSessionFile(sessionId: string, fileId: string): void {

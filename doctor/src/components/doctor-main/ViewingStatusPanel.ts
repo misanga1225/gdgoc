@@ -11,6 +11,7 @@ export interface ViewingStatusPanelOptions {
   elapsedTimeLabel: string;
   progressPercent: number;
   unviewedSections: UnviewedSectionItem[];
+  emptyResultLabel?: string;
 }
 
 export function renderViewingStatusPanel(
@@ -36,12 +37,20 @@ export function renderViewingStatusPanel(
   const listWrap = document.createElement("div");
   listWrap.className = "d05-unviewed-list";
 
-  for (const section of options.unviewedSections.slice(0, 3)) {
-    const item = document.createElement("article");
-    item.className = "d05-unviewed-item";
-    item.dataset.sectionId = section.sectionId;
-    item.textContent = section.title;
-    listWrap.append(item);
+  const items = options.unviewedSections;
+  if (items.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "d05-status-empty";
+    empty.textContent = options.emptyResultLabel ?? "見落としはありません。";
+    listWrap.append(empty);
+  } else {
+    for (const section of items) {
+      const item = document.createElement("article");
+      item.className = "d05-unviewed-item";
+      item.dataset.sectionId = section.sectionId;
+      item.textContent = section.title;
+      listWrap.append(item);
+    }
   }
 
   panel.append(elapsed, progress, listWrap);
