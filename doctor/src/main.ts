@@ -51,15 +51,26 @@ function renderLogin(): void {
   app.append(login);
 }
 
-async function renderD02(): Promise<void> {
+interface D02RenderOptions {
+  preselectedSessionId?: string | null;
+}
+
+async function renderD02(options?: D02RenderOptions): Promise<void> {
   app.className = "app-root app-root--d02";
   app.innerHTML = "";
 
   await renderSessionHubPage(app, {
     loginUserId,
+    initialSelectedSessionId: options?.preselectedSessionId ?? null,
     onLogout: () => void signOut(auth),
-    onOpenD05: ({ sessionId, name, chartId }) => {
-      renderD05(sessionId, name, chartId);
+    onOpenD05: ({
+      sessionId,
+      name,
+      chartId,
+      selectedFileId,
+      selectedFileName,
+    }) => {
+      renderD05(sessionId, name, chartId, selectedFileId, selectedFileName);
     },
     onOpenD03: ({
       initialName,
@@ -97,7 +108,9 @@ function renderD03(
   backButton.className = "btn btn-secondary btn-sm";
   backButton.textContent = "一覧画面へ戻る";
   backButton.addEventListener("click", () => {
-    void renderD02();
+    void renderD02({
+      preselectedSessionId: selectedSessionId,
+    });
   });
 
   const title = document.createElement("h2");
@@ -118,10 +131,14 @@ function renderD03(
       addSessionId(sessionId);
       if (patientUrl) {
         showPatientUrlDialog(buildPatientFullUrl(patientUrl), () => {
-          void renderD02();
+          void renderD02({
+            preselectedSessionId: sessionId,
+          });
         });
       } else {
-        void renderD02();
+        void renderD02({
+          preselectedSessionId: sessionId,
+        });
       }
     },
     {
@@ -138,7 +155,9 @@ function renderD03(
 function renderD05(
   sessionId: string,
   patientName: string,
-  patientChartId: string
+  patientChartId: string,
+  selectedFileId?: string | null,
+  selectedFileName?: string
 ): void {
   app.className = "app-root app-root--d05";
   app.innerHTML = "";
@@ -154,6 +173,8 @@ function renderD05(
     sessionId,
     patientName,
     patientChartId,
+    selectedFileId,
+    selectedFileName,
   });
 }
 

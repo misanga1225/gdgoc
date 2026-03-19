@@ -10,6 +10,7 @@ export interface UploadViewOptions {
   submitLabel?: string;
   targetSessionId?: string;
   targetFileId?: string;
+  targetFileName?: string;
 }
 
 function addParagraphIds(html: string): string {
@@ -130,13 +131,21 @@ export function renderUploadView(
     btnUpload.textContent = "送信中...";
 
     try {
-      // ドキュメントごとに新しいセッション（=新しい署名付きURL）を作成する
-      const created = await createSession(
-        nameInput.value.trim(),
-        idInput.value.trim()
-      );
-      const destinationSessionId = created.session_id;
-      const patientUrl = created.patient_url;
+      let destinationSessionId = options?.targetSessionId ?? "";
+      let patientUrl: string | undefined;
+
+      if (!isExistingSession) {
+        const created = await createSession(
+          nameInput.value.trim(),
+          idInput.value.trim()
+        );
+        destinationSessionId = created.session_id;
+        patientUrl = created.patient_url;
+      }
+
+      if (!destinationSessionId) {
+        throw new Error("アップロード先セッションが特定できません");
+      }
 
       await uploadDocument(destinationSessionId, convertedHtml);
 
