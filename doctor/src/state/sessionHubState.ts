@@ -2,6 +2,8 @@ import { getDocumentMeta } from "./documentMeta";
 
 export interface SessionFileItem {
   id: string;
+  /** このファイルが属するセッションID */
+  sessionId: string;
   name: string;
   updatedAt: string;
   kind: string;
@@ -47,6 +49,7 @@ export function ensureSessionFiles(
   const file: SessionFileItem = meta
     ? {
         id: `${sessionId}-file-1`,
+        sessionId,
         name: meta.fileName.replace(/\.docx$/i, ""),
         updatedAt: formatTimestamp(meta.uploadedAt),
         kind: "HTMLファイル",
@@ -55,6 +58,7 @@ export function ensureSessionFiles(
       }
     : {
         id: `${sessionId}-file-1`,
+        sessionId,
         name: "同意書",
         updatedAt: "-",
         kind: "HTMLファイル",
@@ -65,6 +69,17 @@ export function ensureSessionFiles(
   const files = [file];
   sessionFilesMap.set(sessionId, files);
   return files;
+}
+
+/** グループ（複数セッション）の全ファイルを結合して返す */
+export function ensureGroupFiles(
+  sessions: { sessionId: string; sourceUrl?: string }[]
+): SessionFileItem[] {
+  const allFiles: SessionFileItem[] = [];
+  for (const s of sessions) {
+    allFiles.push(...ensureSessionFiles(s.sessionId, s.sourceUrl));
+  }
+  return allFiles;
 }
 
 export function deleteSessionFile(sessionId: string, fileId: string): void {

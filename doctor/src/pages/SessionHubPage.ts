@@ -12,7 +12,7 @@ import { renderSessionFileTablePane } from "../components/session-hub/SessionFil
 import {
   clearSessionFilesCache,
   deleteSessionFile,
-  ensureSessionFiles,
+  ensureGroupFiles,
   type SessionFileItem,
 } from "../state/sessionHubState";
 import { getSavedSessionIds, removeSessionId } from "../sessions";
@@ -20,8 +20,19 @@ import { showToast } from "../toast";
 import { buildPatientFullUrl } from "../api";
 import { showPatientUrlDialog } from "../components/session-hub/PatientUrlDialog";
 
-interface SessionHubRow extends PatientSessionRow {
+/** バックエンドから取得した1セッション分の情報 */
+interface RawSessionRow {
+  sessionId: string;
+  name: string;
+  chartId: string;
+  statusLabel: SessionStatusLabel;
   sourceUrl?: string;
+}
+
+/** グループ化されたサイドバー行 */
+interface SessionGroup extends PatientSessionRow {
+  /** 各セッションの sourceUrl */
+  sourceUrls: (string | undefined)[];
 }
 
 export interface OpenD03Payload {
@@ -33,7 +44,7 @@ export interface OpenD03Payload {
 
 export interface SessionHubPageOptions {
   loginUserId: string;
-  initialSelectedSessionId?: string | null;
+  initialSelectedGroupKey?: string | null;
   onOpenD05: (session: {
     sessionId: string;
     name: string;
@@ -45,36 +56,30 @@ export interface SessionHubPageOptions {
   onLogout?: () => void;
 }
 
-const FALLBACK_ROWS: SessionHubRow[] = [
+const FALLBACK_GROUPS: SessionGroup[] = [
   {
-    id: "mock-session-1",
+    groupKey: "田中太郎|441255",
     name: "田中太郎",
     chartId: "441255",
+    sessionIds: ["mock-session-1"],
     statusLabel: "未アクセス",
+    sourceUrls: [undefined],
   },
   {
-    id: "mock-session-2",
+    groupKey: "山田聡|298465",
     name: "山田聡",
     chartId: "298465",
+    sessionIds: ["mock-session-2"],
     statusLabel: "未アクセス",
+    sourceUrls: [undefined],
   },
   {
-    id: "mock-session-3",
+    groupKey: "佐藤花子|553210",
     name: "佐藤花子",
     chartId: "553210",
+    sessionIds: ["mock-session-3"],
     statusLabel: "未アクセス",
-  },
-  {
-    id: "mock-session-4",
-    name: "鈴木一郎",
-    chartId: "178923",
-    statusLabel: "未アクセス",
-  },
-  {
-    id: "mock-session-5",
-    name: "高橋美咲",
-    chartId: "662847",
-    statusLabel: "未アクセス",
+    sourceUrls: [undefined],
   },
 ];
 
@@ -83,15 +88,15 @@ export async function renderSessionHubPage(
   options: SessionHubPageOptions
 ): Promise<void> {
   clearSessionFilesCache();
-  const rows = await loadSessionRows();
-  let allRows = rows.length > 0 ? rows : FALLBACK_ROWS;
+  const groups = await loadAndGroupSessions();
+  let allGroups = groups.length > 0 ? groups : FALLBACK_GROUPS;
   let searchDraft = "";
   let searchQuery = "";
-  const preferredSessionId = options.initialSelectedSessionId ?? null;
-  let selectedSessionId: string | null =
-    preferredSessionId && allRows.some((row) => row.id === preferredSessionId)
-      ? preferredSessionId
-      : (allRows[0]?.id ?? null);
+  const preferredGroupKey = options.initialSelectedGroupKey ?? null;
+  let selectedGroupKey: string | null =
+    preferredGroupKey && allGroups.some((g) => g.groupKey === preferredGroupKey)
+      ? preferredGroupKey
+      : (allGroups[0]?.groupKey ?? null);
   let selectedFileId: string | null = null;
   let deleteModal = null as ReturnType<typeof createFileDeleteConfirmModal> | null;
 
@@ -100,65 +105,73 @@ export async function renderSessionHubPage(
     deleteModal = null;
   }
 
-  function filteredRows(): SessionHubRow[] {
+  function filteredGroups(): SessionGroup[] {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
-      return allRows;
+      return allGroups;
     }
-    return allRows.filter((row) => {
+    return allGroups.filter((g) => {
       return (
-        row.name.toLowerCase().includes(query) ||
-        row.chartId.toLowerCase().includes(query)
+        g.name.toLowerCase().includes(query) ||
+        g.chartId.toLowerCase().includes(query)
       );
     });
   }
 
-  function selectedRow(): SessionHubRow | null {
-    if (!selectedSessionId) {
+  function selectedGroup(): SessionGroup | null {
+    if (!selectedGroupKey) {
       return null;
     }
-    return allRows.find((row) => row.id === selectedSessionId) ?? null;
+    return allGroups.find((g) => g.groupKey === selectedGroupKey) ?? null;
   }
 
   function selectedFiles(): SessionFileItem[] {
-    const row = selectedRow();
-    if (!row) {
+    const group = selectedGroup();
+    if (!group) {
       return [];
     }
-    return ensureSessionFiles(row.id, row.sourceUrl);
+    const sessions = group.sessionIds.map((sid, i) => ({
+      sessionId: sid,
+      sourceUrl: group.sourceUrls[i],
+    }));
+    return ensureGroupFiles(sessions);
   }
 
   function openSelectedFile(fileId: string): void {
-    const row = selectedRow();
-    if (!row) {
-      showToast("セッションが選択されていません", "info");
+    const group = selectedGroup();
+    if (!group) {
+      showToast("患者が選択されていません", "info");
       return;
     }
     const file = selectedFiles().find((item) => item.id === fileId);
+    if (!file) return;
     options.onOpenD05({
-      sessionId: row.id,
-      name: row.name,
-      chartId: row.chartId,
+      sessionId: file.sessionId,
+      name: group.name,
+      chartId: group.chartId,
       selectedFileId: fileId,
-      selectedFileName: file?.name,
+      selectedFileName: file.name,
     });
   }
 
-  function requestDelete(fileId: string): void {
-    const row = selectedRow();
-    if (!row) {
-      return;
-    }
+  function showPatientUrlForFile(fileId: string): void {
     const file = selectedFiles().find((item) => item.id === fileId);
-    if (!file) {
-      return;
-    }
+    if (!file) return;
+    const patientPath = `/patient?session=${file.sessionId}`;
+    showPatientUrlDialog(buildPatientFullUrl(patientPath), () => {});
+  }
+
+  function requestDelete(fileId: string): void {
+    const group = selectedGroup();
+    if (!group) return;
+    const file = selectedFiles().find((item) => item.id === fileId);
+    if (!file) return;
 
     destroyDeleteModal();
     deleteModal = createFileDeleteConfirmModal({
       fileName: file.name,
       onConfirm: () => {
-        deleteSessionFile(row.id, fileId);
+        deleteSessionFile(file.sessionId, fileId);
         const nextFiles = selectedFiles();
         selectedFileId = nextFiles[0]?.id ?? null;
         render();
@@ -181,20 +194,11 @@ export async function renderSessionHubPage(
   }
 
   function openD03(): void {
-    const row = selectedRow();
-    if (row) {
-      options.onOpenD03({
-        initialName: row.name,
-        initialPatientId: row.chartId,
-        selectedSessionId: row.id,
-        selectedFileId,
-      });
-      return;
-    }
-
+    const group = selectedGroup();
     options.onOpenD03({
-      initialName: "",
-      initialPatientId: "",
+      initialName: group?.name ?? "",
+      initialPatientId: group?.chartId ?? "",
+      // 常に新セッション作成（既存セッションを上書きしない）
       selectedSessionId: null,
       selectedFileId: null,
     });
@@ -208,21 +212,21 @@ export async function renderSessionHubPage(
     const layout = document.createElement("section");
     layout.className = "d02-layout";
 
-    const rowsToDisplay = filteredRows();
-    if (selectedSessionId && !rowsToDisplay.some((row) => row.id === selectedSessionId)) {
-      selectedSessionId = null;
+    const groupsToDisplay = filteredGroups();
+    if (selectedGroupKey && !groupsToDisplay.some((g) => g.groupKey === selectedGroupKey)) {
+      selectedGroupKey = null;
       selectedFileId = null;
     }
 
-    const row = selectedRow();
+    const group = selectedGroup();
     const files = selectedFiles();
     if (selectedFileId && !files.some((file) => file.id === selectedFileId)) {
       selectedFileId = null;
     }
 
     const leftPane = renderPatientSessionListPane({
-      rows: rowsToDisplay,
-      selectedId: selectedSessionId,
+      rows: groupsToDisplay,
+      selectedGroupKey,
       loginLabel: `ログイン: ${options.loginUserId}`,
       onLogout: options.onLogout,
       searchDraft,
@@ -232,28 +236,30 @@ export async function renderSessionHubPage(
       onSearchSubmit: (next) => {
         searchDraft = next;
         searchQuery = next;
-        selectedSessionId = null;
+        selectedGroupKey = null;
         selectedFileId = null;
         render();
       },
       onClearSelection: () => {
-        selectedSessionId = null;
+        selectedGroupKey = null;
         selectedFileId = null;
         render();
       },
-      onSelect: (id) => {
-        selectedSessionId = id;
+      onSelect: (groupKey) => {
+        selectedGroupKey = groupKey;
         selectedFileId = null;
         render();
       },
-      onDelete: (id) => {
-        if (!confirm("このセッションを削除しますか？")) {
-          return;
+      onDelete: (groupKey) => {
+        const target = allGroups.find((g) => g.groupKey === groupKey);
+        if (!target) return;
+        if (!confirm("この患者の全セッションを削除しますか？")) return;
+        for (const sid of target.sessionIds) {
+          removeSessionId(sid);
         }
-        removeSessionId(id);
-        allRows = allRows.filter((row) => row.id !== id);
-        if (selectedSessionId === id) {
-          selectedSessionId = allRows[0]?.id ?? null;
+        allGroups = allGroups.filter((g) => g.groupKey !== groupKey);
+        if (selectedGroupKey === groupKey) {
+          selectedGroupKey = allGroups[0]?.groupKey ?? null;
           selectedFileId = null;
         }
         render();
@@ -262,8 +268,8 @@ export async function renderSessionHubPage(
     });
 
     const centerPane = renderSessionFileTablePane({
-      sessionName: row?.name ?? "患者未選択",
-      sessionChartId: row?.chartId ?? "-",
+      sessionName: group?.name ?? "患者未選択",
+      sessionChartId: group?.chartId ?? "-",
       files,
       selectedFileId,
       onSelectFile: (fileId) => {
@@ -273,11 +279,8 @@ export async function renderSessionHubPage(
       onOpenFile: openSelectedFile,
       onOpenOriginalFile: openOriginalFile,
       onRequestDelete: requestDelete,
-      onShowPatientUrl: row
-        ? () => {
-            const patientPath = `/patient?session=${row.id}`;
-            showPatientUrlDialog(buildPatientFullUrl(patientPath), () => {});
-          }
+      onShowPatientUrl: selectedFileId
+        ? () => showPatientUrlForFile(selectedFileId!)
         : undefined,
     });
 
@@ -292,33 +295,65 @@ export async function renderSessionHubPage(
   render();
 }
 
-async function loadSessionRows(): Promise<SessionHubRow[]> {
+/** セッション一覧を取得し、(name, chartId) でグループ化する */
+async function loadAndGroupSessions(): Promise<SessionGroup[]> {
   const ids = getSavedSessionIds();
   if (ids.length === 0) {
     return [];
   }
 
-  const tasks = ids.map(async (id): Promise<SessionHubRow> => {
-    try {
-      const session = await getSession(id);
-      return {
-        id,
-        name: String(session.name ?? "患者"),
-        chartId: String(session.patient_id ?? session.patientId ?? id.slice(0, 8)),
-        statusLabel: toStatusLabel(String(session.status ?? "waiting")),
-        sourceUrl: String(session.document_url ?? ""),
-      };
-    } catch {
-      return {
-        id,
-        name: "患者",
-        chartId: id.slice(0, 8),
-        statusLabel: "未アクセス",
-      };
-    }
-  });
+  // 全セッション情報を並列取得
+  const rawRows = await Promise.all(
+    ids.map(async (id): Promise<RawSessionRow> => {
+      try {
+        const session = await getSession(id);
+        return {
+          sessionId: id,
+          name: String(session.name ?? "患者"),
+          chartId: String(session.patient_id ?? session.patientId ?? id.slice(0, 8)),
+          statusLabel: toStatusLabel(String(session.status ?? "waiting")),
+          sourceUrl: String(session.document_url ?? ""),
+        };
+      } catch {
+        return {
+          sessionId: id,
+          name: "患者",
+          chartId: id.slice(0, 8),
+          statusLabel: "未アクセス",
+        };
+      }
+    })
+  );
 
-  return Promise.all(tasks);
+  // (name, chartId) でグループ化
+  const groupMap = new Map<string, SessionGroup>();
+  for (const row of rawRows) {
+    const key = `${row.name}|${row.chartId}`;
+    const existing = groupMap.get(key);
+    if (existing) {
+      existing.sessionIds.push(row.sessionId);
+      existing.sourceUrls.push(row.sourceUrl);
+      // ステータスは最も進んだものを採用
+      existing.statusLabel = mergeStatus(existing.statusLabel, row.statusLabel);
+    } else {
+      groupMap.set(key, {
+        groupKey: key,
+        name: row.name,
+        chartId: row.chartId,
+        sessionIds: [row.sessionId],
+        statusLabel: row.statusLabel,
+        sourceUrls: [row.sourceUrl],
+      });
+    }
+  }
+
+  return Array.from(groupMap.values());
+}
+
+/** ステータスの優先度順にマージ（最も進んだステータスを返す） */
+function mergeStatus(a: SessionStatusLabel, b: SessionStatusLabel): SessionStatusLabel {
+  const order: SessionStatusLabel[] = ["未アクセス", "閲覧中", "確認待ち", "同意許可済", "完了"];
+  return order.indexOf(a) >= order.indexOf(b) ? a : b;
 }
 
 function toStatusLabel(status: string): SessionStatusLabel {

@@ -27,10 +27,8 @@ async function main() {
     return;
   }
 
-  // OTP本人確認（未検証の場合のみ）
-  if (!session.otp_verified) {
-    await showOtpScreen(sessionId, session.name);
-  }
+  // OTP本人確認（毎回要求 — 認証済みでも再認証させることで、医師がURLを流用するのを防ぐ）
+  await showOtpScreen(sessionId, session.name);
 
   // UIを構築
   app.innerHTML = `
@@ -110,6 +108,19 @@ async function main() {
   });
 
   gazeProvider.start(paragraphs);
+
+  // 患者がページを離れたらステータスを未アクセス(waiting)に戻す
+  const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      fetch(`${API_BASE}/sessions/${sessionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "waiting" }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  });
 
   // 医師からのステータス変更を監視
   watchSessionStatus(sessionId, (status) => {

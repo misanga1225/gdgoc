@@ -443,14 +443,6 @@ async fn send_otp(
         return e;
     }
 
-    // 既にOTP検証済みの場合
-    if fields.get("otp_verified").and_then(|v| v.as_bool()).unwrap_or(false) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "OTP already verified" })),
-        );
-    }
-
     let patient_email = fields
         .get("patient_email")
         .and_then(|v| v.as_str())
@@ -535,14 +527,6 @@ async fn verify_otp(
 
     if let Err(e) = check_session_accessible(&fields) {
         return e;
-    }
-
-    // 既にOTP検証済み
-    if fields.get("otp_verified").and_then(|v| v.as_bool()).unwrap_or(false) {
-        return (
-            StatusCode::OK,
-            Json(json!({ "verified": true })),
-        );
     }
 
     // 試行回数チェック
