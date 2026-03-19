@@ -1,5 +1,5 @@
 import "./styles.css";
-import { getSession, updateSessionStatus, sendOtp, verifyOtp } from "./api";
+import { getSession, updateSessionStatus, finalizeSession, sendOtp, verifyOtp } from "./api";
 import { loadDocument } from "./document";
 import { createGazeProvider, MediaPipeGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
@@ -109,27 +109,82 @@ async function main() {
 
   gazeProvider.start(paragraphs);
 
-  // 患者がページを離れたらステータスを未アクセス(waiting)に戻す
+  // 患者がページを離れたらステータスを未アクセス(waiting)に戻し、戻ったらwatchingに復帰する
+  // ただし authorized/completed 状態では遷移しない
   const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+  let currentStatus = "watching";
+
+  // watchSessionStatusのコールバックでcurrentStatusも同期
+  watchSessionStatus(sessionId, (status) => {
+    currentStatus = status;
+    if (status === "authorized") {
+      statusBar.textContent = "医師が最終同意を許可しました";
+      statusBar.className = "status-bar authorized";
+      showConsentButton(sessionId, container, statusBar);
+    } else if (status === "completed") {
+      statusBar.textContent = "同意が完了しました";
+      statusBar.className = "status-bar completed";
+    }
+  });
+
   document.addEventListener("visibilitychange", () => {
+    // authorized/completed 状態ではステータスを変更しない
+    if (currentStatus === "authorized" || currentStatus === "completed") return;
+
     if (document.visibilityState === "hidden") {
+      currentStatus = "waiting";
       fetch(`${API_BASE}/sessions/${sessionId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "waiting" }),
         keepalive: true,
       }).catch(() => {});
+    } else if (document.visibilityState === "visible") {
+      currentStatus = "watching";
+      fetch(`${API_BASE}/sessions/${sessionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "watching" }),
+      }).catch(() => {});
     }
   });
 
-  // 医師からのステータス変更を監視
-  watchSessionStatus(sessionId, (status) => {
-    if (status === "authorized") {
-      statusBar.textContent = "医師が最終同意を許可しました";
-      statusBar.className = "status-bar authorized";
-    } else if (status === "completed") {
+}
+
+/** 最終同意ボタンを患者側に表示する */
+function showConsentButton(
+  sessionId: string,
+  container: HTMLElement,
+  statusBar: HTMLElement
+): void {
+  // 既に表示済みなら何もしない
+  if (document.getElementById("consent-area")) return;
+
+  const consentArea = document.createElement("div");
+  consentArea.id = "consent-area";
+  consentArea.className = "consent-area";
+  consentArea.innerHTML = `
+    <p class="consent-message">医師が説明を完了しました。内容を確認のうえ、同意する場合はボタンを押してください。</p>
+    <button class="btn btn-success btn-block" id="btn-finalize">同意する</button>
+  `;
+  container.appendChild(consentArea);
+
+  const btnFinalize = document.getElementById("btn-finalize") as HTMLButtonElement;
+  btnFinalize.addEventListener("click", async () => {
+    btnFinalize.disabled = true;
+    btnFinalize.textContent = "処理中...";
+    try {
+      await finalizeSession(sessionId);
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
+      consentArea.innerHTML = `<p class="consent-message consent-done">同意が完了しました。ご協力ありがとうございました。</p>`;
+    } catch (e) {
+      btnFinalize.disabled = false;
+      btnFinalize.textContent = "同意する";
+      consentArea.insertAdjacentHTML(
+        "beforeend",
+        `<p class="consent-error">エラーが発生しました: ${e instanceof Error ? e.message : e}</p>`
+      );
     }
   });
 }
