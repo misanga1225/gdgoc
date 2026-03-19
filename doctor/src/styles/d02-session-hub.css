@@ -148,6 +148,7 @@
   padding: 2px 10px;
   font-size: 13px;
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
 }
 
 .d02-status-chip.is-viewing {
@@ -161,9 +162,17 @@
 }
 
 .d02-patient-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   color: var(--color-text-secondary);
   margin-top: var(--space-1);
   font-size: 14px;
+}
+
+.d02-patient-id {
+  min-width: 0;
 }
 
 .d02-empty-text {
@@ -279,8 +288,13 @@
 .d02-file-action-cell {
   text-align: right;
   white-space: nowrap;
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
 }
 
+.d02-file-url-badge,
 .d02-file-delete-button {
   width: 30px;
   height: 30px;
@@ -293,6 +307,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.d02-file-url-badge {
+  min-width: 38px;
+  width: auto;
+  padding: 0 8px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .d02-file-delete-button svg {
@@ -311,6 +336,11 @@
   border-color: #fecaca;
 }
 
+.d02-file-url-badge:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .d02-file-empty-row td {
   text-align: center;
   color: var(--color-text-secondary);
@@ -325,6 +355,14 @@
 .d02-upload-header {
   padding: 20px;
   border-bottom: 1px solid var(--color-border-default);
+}
+
+.d02-upload-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .d02-add-document-button {
@@ -370,4 +408,8 @@
 .d02-add-document-subtitle {
   font-size: 15px;
   color: var(--color-text-secondary);
+}
+
+.d02-logout-button:hover {
+  color: #b91c1c;
 }

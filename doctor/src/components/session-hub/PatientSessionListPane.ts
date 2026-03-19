@@ -1,11 +1,11 @@
-export type SessionStatusLabel = "未アクセス" | "閲覧中" | "確認待ち" | "同意許可済" | "完了";
+export type SessionStatusLabel = string;
 
 export interface PatientSessionRow {
   /** グループキー: `${name}|${chartId}` */
   groupKey: string;
   name: string;
   chartId: string;
-  /** このグループに属する全セッションID */
+  /** このグループに属するセッションID */
   sessionIds: string[];
   statusLabel: SessionStatusLabel;
 }
@@ -108,12 +108,21 @@ export function renderPatientSessionListPane(
     item.type = "button";
     item.className = `d02-patient-item${row.groupKey === options.selectedGroupKey ? " is-selected" : ""}`;
 
+    const statusClass =
+      row.statusLabel === "閲覧中"
+        ? "is-viewing"
+        : row.statusLabel === "未アクセス"
+          ? "is-away"
+          : "is-done";
+
     item.innerHTML = `
       <div class="d02-patient-main">
         <div class="d02-patient-name">${row.name}</div>
-        <span class="d02-status-chip ${row.statusLabel === "閲覧中" ? "is-viewing" : row.statusLabel === "未アクセス" ? "is-away" : "is-done"}">${row.statusLabel}</span>
       </div>
-      <div class="d02-patient-meta">ID - ${row.chartId}</div>
+      <div class="d02-patient-meta">
+        <span class="d02-patient-id">ID - ${row.chartId}</span>
+        <span class="d02-status-chip ${statusClass}">${row.statusLabel}</span>
+      </div>
     `;
 
     item.addEventListener("click", () => {
@@ -140,7 +149,7 @@ export function renderPatientSessionListPane(
     const loginRow = document.createElement("div");
     loginRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:4px;";
     const logoutBtn = document.createElement("button");
-    logoutBtn.className = "btn btn-secondary btn-sm";
+    logoutBtn.className = "btn btn-secondary btn-sm d02-logout-button";
     logoutBtn.textContent = "ログアウト";
     logoutBtn.addEventListener("click", options.onLogout);
     loginRow.append(loginMeta, logoutBtn);

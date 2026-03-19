@@ -10,7 +10,7 @@ export function renderDocumentAddPane(
 
   const header = document.createElement("header");
   header.className = "d02-upload-header";
-  header.innerHTML = `<h2 class="d02-pane-title">資料ファイルアップロード</h2>`;
+  header.innerHTML = `<h2 class="d02-upload-title">資料ファイルアップロード</h2>`;
 
   const addButton = document.createElement("button");
   addButton.type = "button";

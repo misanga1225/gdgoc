@@ -2,7 +2,6 @@ import { getDocumentMeta } from "./documentMeta";
 
 export interface SessionFileItem {
   id: string;
-  /** このファイルが属するセッションID */
   sessionId: string;
   name: string;
   updatedAt: string;
@@ -23,10 +22,29 @@ function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "-";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
 }
 
-/** D02再描画時にキャッシュをクリアし、最新データを反映させる */
+function resolveDisplayKind(fileName: string): string {
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".docx") || lower.endsWith(".doc")) {
+    return "Wordファイル";
+  }
+  if (lower.endsWith(".pdf")) {
+    return "PDFファイル";
+  }
+  if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+    return "Excelファイル";
+  }
+  return "ファイル";
+}
+
+function stripExtension(fileName: string): string {
+  return fileName.replace(/\.[a-z0-9]+$/i, "");
+}
+
 export function clearSessionFilesCache(): void {
   sessionFilesMap.clear();
 }
@@ -50,9 +68,9 @@ export function ensureSessionFiles(
     ? {
         id: `${sessionId}-file-1`,
         sessionId,
-        name: meta.fileName.replace(/\.docx$/i, ""),
+        name: stripExtension(meta.fileName || "資料"),
         updatedAt: formatTimestamp(meta.uploadedAt),
-        kind: "HTMLファイル",
+        kind: resolveDisplayKind(meta.fileName || ""),
         size: formatBytes(meta.fileSize),
         sourceUrl,
       }
@@ -61,7 +79,7 @@ export function ensureSessionFiles(
         sessionId,
         name: "同意書",
         updatedAt: "-",
-        kind: "HTMLファイル",
+        kind: "ファイル",
         size: "-",
         sourceUrl,
       };
@@ -71,7 +89,6 @@ export function ensureSessionFiles(
   return files;
 }
 
-/** グループ（複数セッション）の全ファイルを結合して返す */
 export function ensureGroupFiles(
   sessions: { sessionId: string; sourceUrl?: string }[]
 ): SessionFileItem[] {

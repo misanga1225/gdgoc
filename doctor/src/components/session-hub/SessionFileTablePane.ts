@@ -34,24 +34,6 @@ export function renderSessionFileTablePane(
 
   headerTop.append(headerText);
 
-  if (options.onShowPatientUrl && options.files.length > 0) {
-    const urlBtn = document.createElement("button");
-    urlBtn.type = "button";
-    urlBtn.textContent = "患者URL";
-    Object.assign(urlBtn.style, {
-      padding: "6px 14px",
-      borderRadius: "6px",
-      border: "1px solid #2563eb",
-      background: "transparent",
-      color: "#2563eb",
-      fontSize: "12px",
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-    });
-    urlBtn.addEventListener("click", () => options.onShowPatientUrl!());
-    headerTop.append(urlBtn);
-  }
-
   header.append(headerTop);
 
   const tableWrap = document.createElement("div");
@@ -136,6 +118,24 @@ export function renderSessionFileTablePane(
         ".d02-file-action-cell"
       );
       if (actionCell) {
+        if (options.onShowPatientUrl) {
+          const urlButton = document.createElement("button");
+          urlButton.type = "button";
+          urlButton.className = "d02-file-url-badge";
+          urlButton.textContent = "URL";
+          urlButton.title = "患者URLを表示";
+          urlButton.setAttribute("aria-label", "患者URLを表示");
+          urlButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
+          urlButton.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            options.onShowPatientUrl?.();
+          });
+          actionCell.append(urlButton);
+        }
+
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "d02-file-delete-button";
