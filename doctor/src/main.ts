@@ -52,7 +52,7 @@ function renderLogin(): void {
 }
 
 interface D02RenderOptions {
-  preselectedSessionId?: string | null;
+  preselectedGroupKey?: string | null;
 }
 
 async function renderD02(options?: D02RenderOptions): Promise<void> {
@@ -61,7 +61,7 @@ async function renderD02(options?: D02RenderOptions): Promise<void> {
 
   await renderSessionHubPage(app, {
     loginUserId,
-    initialSelectedSessionId: options?.preselectedSessionId ?? null,
+    initialSelectedGroupKey: options?.preselectedGroupKey ?? null,
     onLogout: () => void signOut(auth),
     onOpenD05: ({
       sessionId,
@@ -91,9 +91,14 @@ async function renderD02(options?: D02RenderOptions): Promise<void> {
 function renderD03(
   initialName: string,
   initialPatientId: string,
-  selectedSessionId: string | null,
-  selectedFileId: string | null
+  _selectedSessionId: string | null,
+  _selectedFileId: string | null
 ): void {
+  // グループキーを計算（戻り時に同じ患者を選択するため）
+  const groupKey = initialName && initialPatientId
+    ? `${initialName}|${initialPatientId}`
+    : null;
+
   app.className = "app-root app-root--d03";
   app.innerHTML = "";
 
@@ -109,7 +114,7 @@ function renderD03(
   backButton.textContent = "一覧画面へ戻る";
   backButton.addEventListener("click", () => {
     void renderD02({
-      preselectedSessionId: selectedSessionId,
+      preselectedGroupKey: groupKey,
     });
   });
 
@@ -129,15 +134,17 @@ function renderD03(
     content,
     (sessionId, patientUrl) => {
       addSessionId(sessionId);
+      // アップロード後のgroupKeyは入力値から算出
+      const newGroupKey = `${initialName}|${initialPatientId}`;
       if (patientUrl) {
         showPatientUrlDialog(buildPatientFullUrl(patientUrl), () => {
           void renderD02({
-            preselectedSessionId: sessionId,
+            preselectedGroupKey: newGroupKey || null,
           });
         });
       } else {
         void renderD02({
-          preselectedSessionId: sessionId,
+          preselectedGroupKey: newGroupKey || null,
         });
       }
     },
@@ -146,8 +153,6 @@ function renderD03(
       submitLabel: "アップロードしてURLを発行",
       initialName,
       initialPatientId,
-      targetSessionId: selectedSessionId ?? undefined,
-      targetFileId: selectedFileId ?? undefined,
     }
   );
 }

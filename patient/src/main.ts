@@ -109,6 +109,19 @@ async function main() {
 
   gazeProvider.start(paragraphs);
 
+  // 患者がページを離れたらステータスを未アクセス(waiting)に戻す
+  const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8081";
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      fetch(`${API_BASE}/sessions/${sessionId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "waiting" }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  });
+
   // 医師からのステータス変更を監視
   watchSessionStatus(sessionId, (status) => {
     if (status === "authorized") {

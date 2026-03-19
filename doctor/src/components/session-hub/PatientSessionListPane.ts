@@ -1,22 +1,25 @@
 export type SessionStatusLabel = "未アクセス" | "閲覧中" | "確認待ち" | "同意許可済" | "完了";
 
 export interface PatientSessionRow {
-  id: string;
+  /** グループキー: `${name}|${chartId}` */
+  groupKey: string;
   name: string;
   chartId: string;
+  /** このグループに属する全セッションID */
+  sessionIds: string[];
   statusLabel: SessionStatusLabel;
 }
 
 export interface PatientSessionListPaneOptions {
   rows: PatientSessionRow[];
-  selectedId: string | null;
+  selectedGroupKey: string | null;
   loginLabel: string;
   searchDraft: string;
   onSearchDraftChange: (value: string) => void;
   onSearchSubmit: (value: string) => void;
   onClearSelection: () => void;
-  onSelect: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onSelect: (groupKey: string) => void;
+  onDelete?: (groupKey: string) => void;
   onLogout?: () => void;
 }
 
@@ -103,7 +106,7 @@ export function renderPatientSessionListPane(
   for (const row of options.rows) {
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `d02-patient-item${row.id === options.selectedId ? " is-selected" : ""}`;
+    item.className = `d02-patient-item${row.groupKey === options.selectedGroupKey ? " is-selected" : ""}`;
 
     item.innerHTML = `
       <div class="d02-patient-main">
@@ -114,7 +117,7 @@ export function renderPatientSessionListPane(
     `;
 
     item.addEventListener("click", () => {
-      options.onSelect(row.id);
+      options.onSelect(row.groupKey);
     });
 
     if (options.onDelete) {
@@ -125,7 +128,7 @@ export function renderPatientSessionListPane(
       deleteBtn.title = "削除";
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        options.onDelete!(row.id);
+        options.onDelete!(row.groupKey);
       });
       item.querySelector(".d02-patient-main")?.append(deleteBtn);
     }
