@@ -171,6 +171,15 @@ export async function renderSessionHubPage(
     deleteModal.open();
   }
 
+  function openOriginalFile(fileId: string): void {
+    const file = selectedFiles().find((item) => item.id === fileId);
+    if (!file?.sourceUrl) {
+      showToast("原本ファイルURLが見つかりません", "info");
+      return;
+    }
+    window.open(file.sourceUrl, "_blank", "noopener,noreferrer");
+  }
+
   function openD03(): void {
     const row = selectedRow();
     if (row) {
@@ -262,6 +271,7 @@ export async function renderSessionHubPage(
         render();
       },
       onOpenFile: openSelectedFile,
+      onOpenOriginalFile: openOriginalFile,
       onRequestDelete: requestDelete,
       onShowPatientUrl: row
         ? () => {

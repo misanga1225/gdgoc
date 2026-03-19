@@ -7,6 +7,7 @@ export interface SessionFileTablePaneOptions {
   selectedFileId: string | null;
   onSelectFile: (fileId: string) => void;
   onOpenFile: (fileId: string) => void;
+  onOpenOriginalFile: (fileId: string) => void;
   onRequestDelete: (fileId: string) => void;
   onShowPatientUrl?: () => void;
 }
@@ -96,7 +97,15 @@ export function renderSessionFileTablePane(
       <td>${file.updatedAt}</td>
       <td>${file.kind}</td>
       <td>${file.size}</td>
-      <td class="d02-file-action-cell"></td>
+      <td class="d02-file-action-cell">
+        <button type="button" class="d02-file-open-original-button" title="元ファイルを開く" aria-label="元ファイルを開く">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+            <path d="M14 4h6v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M20 4L10 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </td>
     `;
 
     row.addEventListener("click", () => {
@@ -114,6 +123,20 @@ export function renderSessionFileTablePane(
       }
     });
 
+    const openOriginalButton = row.querySelector<HTMLButtonElement>(
+      ".d02-file-open-original-button"
+    );
+    if (openOriginalButton) {
+      openOriginalButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      openOriginalButton.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        options.onOpenOriginalFile(file.id);
+      });
+    }
+
     if (options.selectedFileId === file.id) {
       const actionCell = row.querySelector<HTMLTableCellElement>(
         ".d02-file-action-cell"
@@ -122,7 +145,17 @@ export function renderSessionFileTablePane(
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "d02-file-delete-button";
-        deleteButton.textContent = "削除";
+        deleteButton.innerHTML = `
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+            <path d="M6 7h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M10 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            <path d="M9 7l1-2h4l1 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M8 7v11a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          </svg>
+        `;
+        deleteButton.title = "削除";
+        deleteButton.setAttribute("aria-label", "削除");
         deleteButton.addEventListener("click", (event) => {
           event.stopPropagation();
           options.onRequestDelete(file.id);

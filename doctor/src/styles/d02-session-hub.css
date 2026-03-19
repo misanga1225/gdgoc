@@ -278,20 +278,49 @@
 }
 
 .d02-col-action {
-  width: 90px;
+  width: 110px;
 }
 
 .d02-file-action-cell {
   text-align: right;
+  white-space: nowrap;
 }
 
+.d02-file-open-original-button,
 .d02-file-delete-button {
-  padding: 6px 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-button);
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.d02-file-open-original-button {
+  margin-right: 6px;
+}
+
+.d02-file-open-original-button svg,
+.d02-file-delete-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.d02-file-delete-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.d02-file-open-original-button:hover {
+  background: #f0f7ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .d02-file-delete-button:hover {
