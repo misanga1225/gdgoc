@@ -247,9 +247,16 @@
 }
 
 .d02-file-type-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
 }
 
 .d02-file-type-icon svg {
@@ -257,20 +264,8 @@
   height: 100%;
 }
 
-.d02-file-type-icon.is-pdf {
-  color: #ef4444;
-}
-
-.d02-file-type-icon.is-word {
-  color: #3b82f6;
-}
-
-.d02-file-type-icon.is-excel {
-  color: #22c55e;
-}
-
-.d02-file-type-icon.is-generic {
-  color: #6b7280;
+.d02-file-type-icon:hover {
+  background: #eef2ff;
 }
 
 .d02-file-name-text {
@@ -278,7 +273,7 @@
 }
 
 .d02-col-action {
-  width: 110px;
+  width: 64px;
 }
 
 .d02-file-action-cell {
@@ -286,7 +281,6 @@
   white-space: nowrap;
 }
 
-.d02-file-open-original-button,
 .d02-file-delete-button {
   width: 30px;
   height: 30px;
@@ -301,11 +295,6 @@
   justify-content: center;
 }
 
-.d02-file-open-original-button {
-  margin-right: 6px;
-}
-
-.d02-file-open-original-button svg,
 .d02-file-delete-button svg {
   width: 16px;
   height: 16px;
@@ -315,12 +304,6 @@
   color: #b91c1c;
   border-color: #fecaca;
   background: #fff7f7;
-}
-
-.d02-file-open-original-button:hover {
-  background: #f0f7ff;
-  border-color: #93c5fd;
-  color: #1d4ed8;
 }
 
 .d02-file-delete-button:hover {

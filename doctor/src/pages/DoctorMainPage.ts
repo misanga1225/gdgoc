@@ -321,7 +321,8 @@ export function renderDoctorMainPage(
       }
       if (sessionStatus === "completed" && prevStatus !== "completed") {
         showToast("患者が最終同意を完了しました。", "success");
-        render();
+        options?.onBackToD02?.();
+        return;
       }
     });
 

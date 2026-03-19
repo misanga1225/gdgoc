@@ -90,22 +90,16 @@ export function renderSessionFileTablePane(
     row.innerHTML = `
       <td class="d02-file-name">
         <span class="d02-file-name-cell">
-          <span class="d02-file-type-icon ${icon.className}" aria-hidden="true">${icon.svg}</span>
+          <button type="button" class="d02-file-type-icon ${icon.className}" title="元ファイルを開く" aria-label="元ファイルを開く">
+            ${icon.svg}
+          </button>
           <span class="d02-file-name-text">${file.name}</span>
         </span>
       </td>
       <td>${file.updatedAt}</td>
       <td>${file.kind}</td>
       <td>${file.size}</td>
-      <td class="d02-file-action-cell">
-        <button type="button" class="d02-file-open-original-button" title="元ファイルを開く" aria-label="元ファイルを開く">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
-            <path d="M14 4h6v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M20 4L10 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-            <path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-          </svg>
-        </button>
-      </td>
+      <td class="d02-file-action-cell"></td>
     `;
 
     row.addEventListener("click", () => {
@@ -123,14 +117,14 @@ export function renderSessionFileTablePane(
       }
     });
 
-    const openOriginalButton = row.querySelector<HTMLButtonElement>(
-      ".d02-file-open-original-button"
+    const fileTypeIcon = row.querySelector<HTMLButtonElement>(
+      ".d02-file-type-icon"
     );
-    if (openOriginalButton) {
-      openOriginalButton.addEventListener("click", (event) => {
+    if (fileTypeIcon) {
+      fileTypeIcon.addEventListener("click", (event) => {
         event.stopPropagation();
       });
-      openOriginalButton.addEventListener("dblclick", (event) => {
+      fileTypeIcon.addEventListener("dblclick", (event) => {
         event.preventDefault();
         event.stopPropagation();
         options.onOpenOriginalFile(file.id);
@@ -178,7 +172,7 @@ function createFileIcon(kind: string): { className: string; svg: string } {
   if (normalized.includes("pdf")) {
     return {
       className: "is-pdf",
-      svg: fileSvgTemplate("PDF"),
+      svg: fileSvgTemplate("P"),
     };
   }
   if (normalized.includes("word")) {
@@ -200,11 +194,22 @@ function createFileIcon(kind: string): { className: string; svg: string } {
 }
 
 function fileSvgTemplate(letter: string): string {
+  let badgeColor = "#6B7280";
+  if (letter === "W") {
+    badgeColor = "#2563EB";
+  } else if (letter === "P") {
+    badgeColor = "#DC2626";
+  } else if (letter === "X") {
+    badgeColor = "#16A34A";
+  }
+
   return `
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-      <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.8"/>
-      <path d="M14 3v5h5" stroke="currentColor" stroke-width="1.8"/>
-      <text x="12" y="17" text-anchor="middle" font-size="7.2" font-family="Arial, sans-serif" fill="currentColor">${letter}</text>
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true">
+      <path d="M8 3.5h7.5L20 8v12.5a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" fill="#FFFFFF" stroke="#9CA3AF" stroke-width="1.3"/>
+      <path d="M15.5 3.5V8H20" stroke="#9CA3AF" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M12.4 11h5.1M12.4 13.2h5.1M12.4 15.4h5.1" stroke="#D1D5DB" stroke-width="1.1" stroke-linecap="round"/>
+      <rect x="2.2" y="10.2" width="9.8" height="9.8" rx="1.6" fill="${badgeColor}" />
+      <text x="7.1" y="17.1" text-anchor="middle" font-size="5.6" font-weight="700" font-family="Segoe UI, Arial, sans-serif" fill="#FFFFFF">${letter}</text>
     </svg>
   `.trim();
 }
