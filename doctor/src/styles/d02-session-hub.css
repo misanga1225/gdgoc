@@ -288,10 +288,6 @@
 .d02-file-action-cell {
   text-align: right;
   white-space: nowrap;
-  display: inline-flex;
-  justify-content: flex-end;
-  gap: 6px;
-  width: 100%;
 }
 
 .d02-file-url-badge,
@@ -307,6 +303,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-left: 6px;
 }
 
 .d02-file-url-badge {

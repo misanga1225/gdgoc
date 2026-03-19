@@ -111,9 +111,7 @@ export function renderPatientSessionListPane(
     const statusClass =
       row.statusLabel === "閲覧中"
         ? "is-viewing"
-        : row.statusLabel === "未アクセス"
-          ? "is-away"
-          : "is-done";
+        : "is-away";
 
     item.innerHTML = `
       <div class="d02-patient-main">

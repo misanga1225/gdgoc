@@ -12,6 +12,28 @@ export interface SessionFileItem {
 
 const sessionFilesMap = new Map<string, SessionFileItem[]>();
 
+/* ── デモ用モックファイル（ハッカソン向け） ── */
+const DEMO_SESSION_ID = "demo-saito-base";
+
+const DEMO_MOCK_FILES: SessionFileItem[] = [
+  {
+    id: "demo-saito-excel",
+    sessionId: DEMO_SESSION_ID,
+    name: "入院診療計画書",
+    updatedAt: "2026/03/15 09:32",
+    kind: "Excelファイル",
+    size: "245KB",
+  },
+  {
+    id: "demo-saito-pdf",
+    sessionId: DEMO_SESSION_ID,
+    name: "退院療養計画書",
+    updatedAt: "2026/03/17 14:08",
+    kind: "PDFファイル",
+    size: "1.8MB",
+  },
+];
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`;
@@ -56,6 +78,11 @@ export function ensureSessionFiles(
   const existing = sessionFilesMap.get(sessionId);
   if (existing) {
     return existing;
+  }
+
+  if (sessionId === DEMO_SESSION_ID) {
+    sessionFilesMap.set(sessionId, [...DEMO_MOCK_FILES]);
+    return sessionFilesMap.get(sessionId)!;
   }
 
   if (!sourceUrl) {

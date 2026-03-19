@@ -56,6 +56,28 @@ export interface SessionHubPageOptions {
   onLogout?: () => void;
 }
 
+/* ── デモ用固定グループ（ハッカソン向け） ── */
+const DEMO_GROUP: SessionGroup = {
+  groupKey: "斎藤琢磨|612847",
+  name: "斎藤琢磨",
+  chartId: "612847",
+  sessionIds: ["demo-saito-base"],
+  statusLabel: "不在",
+  sourceUrls: [undefined],
+};
+
+function mergeDemoGroup(groups: SessionGroup[]): SessionGroup[] {
+  const existing = groups.find((g) => g.groupKey === DEMO_GROUP.groupKey);
+  if (existing) {
+    if (!existing.sessionIds.includes(DEMO_GROUP.sessionIds[0])) {
+      existing.sessionIds.unshift(DEMO_GROUP.sessionIds[0]);
+      existing.sourceUrls.unshift(undefined);
+    }
+    return groups;
+  }
+  return [DEMO_GROUP, ...groups];
+}
+
 const FALLBACK_GROUPS: SessionGroup[] = [
   {
     groupKey: "田中太郎|441255",
@@ -89,14 +111,14 @@ export async function renderSessionHubPage(
 ): Promise<void> {
   clearSessionFilesCache();
   const groups = await loadAndGroupSessions();
-  let allGroups = groups.length > 0 ? groups : FALLBACK_GROUPS;
+  let allGroups = mergeDemoGroup(groups.length > 0 ? groups : FALLBACK_GROUPS);
   let searchDraft = "";
   let searchQuery = "";
   const preferredGroupKey = options.initialSelectedGroupKey ?? null;
   let selectedGroupKey: string | null =
     preferredGroupKey && allGroups.some((g) => g.groupKey === preferredGroupKey)
       ? preferredGroupKey
-      : (allGroups[0]?.groupKey ?? null);
+      : null;
   let selectedFileId: string | null = null;
   let deleteModal = null as ReturnType<typeof createFileDeleteConfirmModal> | null;
 
@@ -138,6 +160,10 @@ export async function renderSessionHubPage(
   }
 
   function openSelectedFile(fileId: string): void {
+    if (fileId.startsWith("demo-saito-")) {
+      showToast("このファイルはデモ用です", "info");
+      return;
+    }
     const group = selectedGroup();
     if (!group) {
       showToast("患者が選択されていません", "info");
@@ -162,6 +188,10 @@ export async function renderSessionHubPage(
   }
 
   function requestDelete(fileId: string): void {
+    if (fileId.startsWith("demo-saito-")) {
+      showToast("デモファイルは削除できません", "info");
+      return;
+    }
     const group = selectedGroup();
     if (!group) return;
     const file = selectedFiles().find((item) => item.id === fileId);
@@ -352,7 +382,7 @@ async function loadAndGroupSessions(): Promise<SessionGroup[]> {
 
 /** ステータスの優先度順にマージ（最も進んだステータスを返す） */
 function mergeStatus(a: SessionStatusLabel, b: SessionStatusLabel): SessionStatusLabel {
-  const order: SessionStatusLabel[] = ["未アクセス", "閲覧中", "確認待ち", "同意許可済", "完了"];
+  const order: SessionStatusLabel[] = ["不在", "閲覧中"];
   return order.indexOf(a) >= order.indexOf(b) ? a : b;
 }
 
@@ -360,13 +390,7 @@ function toStatusLabel(status: string): SessionStatusLabel {
   switch (status) {
     case "watching":
       return "閲覧中";
-    case "reviewed":
-      return "確認待ち";
-    case "authorized":
-      return "同意許可済";
-    case "completed":
-      return "完了";
     default:
-      return "未アクセス";
+      return "不在";
   }
 }
