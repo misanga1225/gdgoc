@@ -120,7 +120,7 @@ async function main() {
     if (status === "authorized") {
       statusBar.textContent = "医師が最終同意を許可しました";
       statusBar.className = "status-bar authorized";
-      showP04ConsentModal(sessionId, statusBar);
+      showConsentButton(sessionId, statusBar, container);
     } else if (status === "completed") {
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
@@ -151,77 +151,45 @@ async function main() {
 
 }
 
-/** 患者用終了同意モーダル（P-04）を表示する */
-function showP04ConsentModal(sessionId: string, statusBar: HTMLElement): void {
-  if (document.getElementById("p04-overlay")) {
+/** ドキュメント最下部に最終同意ボタンを表示する */
+function showConsentButton(sessionId: string, statusBar: HTMLElement, docContainer: HTMLElement): void {
+  if (document.getElementById("consent-area")) {
     return;
   }
 
-  const overlay = document.createElement("div");
-  overlay.id = "p04-overlay";
-  overlay.className = "p04-overlay";
-
-  const dialog = document.createElement("section");
-  dialog.className = "p04-dialog";
-  dialog.setAttribute("role", "dialog");
-  dialog.setAttribute("aria-modal", "true");
-  dialog.setAttribute("aria-labelledby", "p04-title");
-  dialog.setAttribute("aria-describedby", "p04-description");
-
-  dialog.innerHTML = `
-    <h2 id="p04-title" class="p04-title">確認して説明を終了しますか？</h2>
-    <p id="p04-description" class="p04-description">内容を確認し、問題なければ終了を確定してください。</p>
-    <ul class="p04-checklist">
-      <li>・説明内容を理解した</li>
-      <li>・質問事項は解消した</li>
-      <li>・確認して説明を終了する</li>
-    </ul>
-    <p class="p04-error" id="p04-error" hidden></p>
-    <div class="p04-actions">
-      <button type="button" class="btn p04-cancel" id="p04-cancel">キャンセル</button>
-      <button type="button" class="btn btn-success p04-confirm" id="p04-confirm">確認して説明を終了</button>
-    </div>
+  const area = document.createElement("div");
+  area.id = "consent-area";
+  area.className = "consent-area";
+  area.innerHTML = `
+    <p class="consent-message">内容を確認し、問題なければ最終同意を確定してください。</p>
+    <p class="consent-error" id="consent-error" hidden></p>
+    <button type="button" class="btn btn-success btn-block" id="consent-confirm">最終同意</button>
   `;
 
-  overlay.append(dialog);
-  document.body.append(overlay);
-  document.body.classList.add("modal-open");
+  docContainer.append(area);
 
-  const cancelButton = dialog.querySelector<HTMLButtonElement>("#p04-cancel");
-  const confirmButton = dialog.querySelector<HTMLButtonElement>("#p04-confirm");
-  const errorText = dialog.querySelector<HTMLElement>("#p04-error");
+  const confirmButton = area.querySelector<HTMLButtonElement>("#consent-confirm")!;
+  const errorText = area.querySelector<HTMLElement>("#consent-error")!;
 
-  const close = (): void => {
-    overlay.remove();
-    document.body.classList.remove("modal-open");
-  };
-
-  cancelButton?.addEventListener("click", () => {
-    close();
-  });
-
-  confirmButton?.addEventListener("click", async () => {
-    if (!confirmButton) return;
+  confirmButton.addEventListener("click", async () => {
     confirmButton.disabled = true;
     confirmButton.textContent = "処理中...";
-    if (errorText) {
-      errorText.hidden = true;
-      errorText.textContent = "";
-    }
+    errorText.hidden = true;
+    errorText.textContent = "";
     try {
       await finalizeSession(sessionId);
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
-      close();
+      area.innerHTML = `<p class="consent-done">同意が完了しました</p>`;
     } catch (e) {
       confirmButton.disabled = false;
-      confirmButton.textContent = "確認して説明を終了";
-      if (errorText) {
-        errorText.hidden = false;
-        errorText.textContent = `エラーが発生しました: ${e instanceof Error ? e.message : e}`;
-      }
+      confirmButton.textContent = "最終同意";
+      errorText.hidden = false;
+      errorText.textContent = `エラーが発生しました: ${e instanceof Error ? e.message : e}`;
     }
   });
+
+  area.scrollIntoView({ behavior: "smooth" });
 }
 
 /** OTP本人確認画面を表示し、検証完了まで待機する */

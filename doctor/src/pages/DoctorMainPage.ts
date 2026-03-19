@@ -262,9 +262,8 @@ export function renderDoctorMainPage(
     }
   }
 
-  void initializeSession();
-  subscribeRealtime();
   render();
+  void initializeSession().then(() => subscribeRealtime());
 
   async function initializeSession(): Promise<void> {
     try {
