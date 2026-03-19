@@ -33,7 +33,14 @@ export interface OpenD03Payload {
 
 export interface SessionHubPageOptions {
   loginUserId: string;
-  onOpenD05: (session: { sessionId: string; name: string; chartId: string }) => void;
+  initialSelectedSessionId?: string | null;
+  onOpenD05: (session: {
+    sessionId: string;
+    name: string;
+    chartId: string;
+    selectedFileId?: string | null;
+    selectedFileName?: string;
+  }) => void;
   onOpenD03: (payload: OpenD03Payload) => void;
   onLogout?: () => void;
 }
@@ -80,7 +87,11 @@ export async function renderSessionHubPage(
   let allRows = rows.length > 0 ? rows : FALLBACK_ROWS;
   let searchDraft = "";
   let searchQuery = "";
-  let selectedSessionId: string | null = allRows[0]?.id ?? null;
+  const preferredSessionId = options.initialSelectedSessionId ?? null;
+  let selectedSessionId: string | null =
+    preferredSessionId && allRows.some((row) => row.id === preferredSessionId)
+      ? preferredSessionId
+      : (allRows[0]?.id ?? null);
   let selectedFileId: string | null = null;
   let deleteModal = null as ReturnType<typeof createFileDeleteConfirmModal> | null;
 
@@ -117,16 +128,19 @@ export async function renderSessionHubPage(
     return ensureSessionFiles(row.id, row.sourceUrl);
   }
 
-  function openSelectedFile(_fileId: string): void {
+  function openSelectedFile(fileId: string): void {
     const row = selectedRow();
     if (!row) {
       showToast("セッションが選択されていません", "info");
       return;
     }
+    const file = selectedFiles().find((item) => item.id === fileId);
     options.onOpenD05({
       sessionId: row.id,
       name: row.name,
       chartId: row.chartId,
+      selectedFileId: fileId,
+      selectedFileName: file?.name,
     });
   }
 
@@ -169,15 +183,10 @@ export async function renderSessionHubPage(
       return;
     }
 
-    const draft = createDraftRow();
-    allRows = [draft, ...allRows];
-    selectedSessionId = draft.id;
-    selectedFileId = null;
-
     options.onOpenD03({
-      initialName: draft.name,
-      initialPatientId: draft.chartId,
-      selectedSessionId: draft.id,
+      initialName: "",
+      initialPatientId: "",
+      selectedSessionId: null,
       selectedFileId: null,
     });
   }
@@ -227,17 +236,6 @@ export async function renderSessionHubPage(
         selectedSessionId = id;
         selectedFileId = null;
         render();
-      },
-      onOpenD05: (id) => {
-        const target = allRows.find((item) => item.id === id);
-        if (!target) {
-          return;
-        }
-        options.onOpenD05({
-          sessionId: target.id,
-          name: target.name,
-          chartId: target.chartId,
-        });
       },
       onDelete: (id) => {
         if (!confirm("このセッションを削除しますか？")) {
@@ -311,15 +309,6 @@ async function loadSessionRows(): Promise<SessionHubRow[]> {
   });
 
   return Promise.all(tasks);
-}
-
-function createDraftRow(): SessionHubRow {
-  return {
-    id: `draft-${Date.now()}`,
-    name: "新規患者",
-    chartId: `TEMP-${Math.floor(Math.random() * 900000 + 100000)}`,
-    statusLabel: "未アクセス",
-  };
 }
 
 function toStatusLabel(status: string): SessionStatusLabel {

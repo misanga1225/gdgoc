@@ -16,7 +16,6 @@ export interface PatientSessionListPaneOptions {
   onSearchSubmit: (value: string) => void;
   onClearSelection: () => void;
   onSelect: (id: string) => void;
-  onOpenD05: (id: string) => void;
   onDelete?: (id: string) => void;
   onLogout?: () => void;
 }
@@ -116,10 +115,6 @@ export function renderPatientSessionListPane(
 
     item.addEventListener("click", () => {
       options.onSelect(row.id);
-    });
-
-    item.addEventListener("dblclick", () => {
-      options.onOpenD05(row.id);
     });
 
     if (options.onDelete) {

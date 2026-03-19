@@ -26,6 +26,8 @@ export interface DoctorMainPageOptions {
   sessionId: string;
   patientName?: string;
   patientChartId?: string;
+  selectedFileId?: string | null;
+  selectedFileName?: string;
 }
 
 const DWELL_THRESHOLD = 3;

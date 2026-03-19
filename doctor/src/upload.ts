@@ -10,7 +10,10 @@ export interface UploadViewOptions {
   submitLabel?: string;
   targetSessionId?: string;
   targetFileId?: string;
+  targetFileName?: string;
 }
+
+const MAX_DOCX_FILE_SIZE = 50 * 1024 * 1024;
 
 function addParagraphIds(html: string): string {
   const container = document.createElement("div");
@@ -61,6 +64,7 @@ export function renderUploadView(
       <div class="form-group">
         <label for="docx-file">資料ファイル (.docx)</label>
         <input type="file" id="docx-file" accept=".docx" />
+        <div id="upload-file-error" style="display:none; margin-top:8px; color:#b91c1c; font-size:12px;"></div>
       </div>
       <div id="upload-preview" style="display:none; margin-top:12px; padding:12px; border:1px solid #ddd; border-radius:6px; max-height:200px; overflow-y:auto; font-size:13px;"></div>
       <div id="upload-info" style="margin-top:8px; font-size:13px; color:#666;"></div>
@@ -77,6 +81,7 @@ export function renderUploadView(
   const btnUpload = document.getElementById("btn-upload") as HTMLButtonElement;
   const preview = document.getElementById("upload-preview") as HTMLDivElement;
   const info = document.getElementById("upload-info") as HTMLDivElement;
+  const fileError = document.getElementById("upload-file-error") as HTMLDivElement;
 
   if (options?.initialName) {
     nameInput.value = options.initialName;
@@ -99,6 +104,16 @@ export function renderUploadView(
     }
   }
 
+  function clearFileError(): void {
+    fileError.textContent = "";
+    fileError.style.display = "none";
+  }
+
+  function showFileError(message: string): void {
+    fileError.textContent = message;
+    fileError.style.display = "block";
+  }
+
   if (!isExistingSession) {
     nameInput.addEventListener("input", updateButtonDisabled);
     idInput.addEventListener("input", updateButtonDisabled);
@@ -110,6 +125,33 @@ export function renderUploadView(
     if (!file) {
       return;
     }
+
+    const isDocx = file.name.toLowerCase().endsWith(".docx");
+    if (!isDocx) {
+      convertedHtml = "";
+      selectedFileName = "";
+      selectedFileSize = 0;
+      preview.innerHTML = "";
+      preview.style.display = "none";
+      info.textContent = "";
+      showFileError("Wordファイル（.docx）を選択してください。");
+      updateButtonDisabled();
+      return;
+    }
+
+    if (file.size > MAX_DOCX_FILE_SIZE) {
+      convertedHtml = "";
+      selectedFileName = "";
+      selectedFileSize = 0;
+      preview.innerHTML = "";
+      preview.style.display = "none";
+      info.textContent = "";
+      showFileError("ファイルサイズ上限（50MiB）を超えています。");
+      updateButtonDisabled();
+      return;
+    }
+
+    clearFileError();
 
     info.textContent = "変換中...";
     try {
@@ -130,6 +172,8 @@ export function renderUploadView(
     } catch (error) {
       info.textContent = `変換エラー: ${error}`;
       convertedHtml = "";
+      preview.innerHTML = "";
+      preview.style.display = "none";
       updateButtonDisabled();
     }
   });
@@ -139,14 +183,22 @@ export function renderUploadView(
     btnUpload.textContent = "送信中...";
 
     try {
-      // ドキュメントごとに新しいセッション（=新しい署名付きURL）を作成する
-      const created = await createSession(
-        nameInput.value.trim(),
-        idInput.value.trim(),
-        emailInput.value.trim()
-      );
-      const destinationSessionId = created.session_id;
-      const patientUrl = created.patient_url;
+      let destinationSessionId = options?.targetSessionId ?? "";
+      let patientUrl: string | undefined;
+
+      if (!isExistingSession) {
+        const created = await createSession(
+          nameInput.value.trim(),
+          idInput.value.trim(),
+          emailInput.value.trim()
+        );
+        destinationSessionId = created.session_id;
+        patientUrl = created.patient_url;
+      }
+
+      if (!destinationSessionId) {
+        throw new Error("アップロード先セッションが特定できません");
+      }
 
       await uploadDocument(destinationSessionId, convertedHtml);
 
@@ -156,7 +208,7 @@ export function renderUploadView(
         uploadedAt: new Date().toISOString(),
       });
 
-      showToast("セッションを作成しました", "success");
+      showToast("アップロードが完了しました", "success");
 
       onSessionCreated(destinationSessionId, patientUrl);
     } catch (error) {
