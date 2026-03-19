@@ -27,10 +27,8 @@ async function main() {
     return;
   }
 
-  // OTP本人確認（未検証の場合のみ）
-  if (!session.otp_verified) {
-    await showOtpScreen(sessionId, session.name);
-  }
+  // OTP本人確認（毎回要求 — 認証済みでも再認証させることで、医師がURLを流用するのを防ぐ）
+  await showOtpScreen(sessionId, session.name);
 
   // UIを構築
   app.innerHTML = `
