@@ -131,6 +131,42 @@ body {
   color: #5f6368;
 }
 
+/* 最終同意エリア */
+.consent-area {
+  margin-top: 32px;
+  padding: 24px;
+  background: #e6f4ea;
+  border: 2px solid #34a853;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.consent-message {
+  font-size: 15px;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.consent-done {
+  font-size: 16px;
+  font-weight: bold;
+  color: #34a853;
+  margin-bottom: 0;
+}
+
+.consent-error {
+  margin-top: 12px;
+  color: #d93025;
+  font-size: 13px;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
 /* エラー */
 .error {
   text-align: center;
