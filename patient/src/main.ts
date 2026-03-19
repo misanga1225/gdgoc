@@ -1,5 +1,5 @@
 import "./styles.css";
-import { getSession, updateSessionStatus, finalizeSession } from "./api";
+import { getSession, updateSessionStatus } from "./api";
 import { loadDocument } from "./document";
 import { createGazeProvider, MediaPipeGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
@@ -29,21 +29,19 @@ async function main() {
 
   // UIを構築
   app.innerHTML = `
-    <div class="header">
-      <h1>Aurlum - 同意書閲覧</h1>
-      <div class="session-info">${session.name} 様</div>
-    </div>
-    <div class="status-bar watching" id="status-bar">閲覧中</div>
-    <div id="document-container"></div>
-    <div class="actions">
-      <button class="btn btn-success" id="btn-final" style="display:none" disabled>
-        最終同意
-      </button>
+    <div class="p01-page">
+      <div class="p01-top-layer">
+        <div class="header">
+          <h1>Aurlum - 同意書閲覧</h1>
+          <div class="session-info">${session.name} 様</div>
+        </div>
+        <div class="status-bar watching" id="status-bar">閲覧中</div>
+      </div>
+      <div id="document-container"></div>
     </div>
   `;
 
   const statusBar = document.getElementById("status-bar")!;
-  const btnFinal = document.getElementById("btn-final") as HTMLButtonElement;
   const container = document.getElementById("document-container")!;
 
   // 文書を読み込み
@@ -113,39 +111,9 @@ async function main() {
     if (status === "authorized") {
       statusBar.textContent = "医師が最終同意を許可しました";
       statusBar.className = "status-bar authorized";
-      btnFinal.style.display = "inline-block";
-      btnFinal.disabled = false;
     } else if (status === "completed") {
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
-      btnFinal.disabled = true;
-      btnFinal.textContent = "同意済み";
-    }
-  });
-
-  // 最終同意ボタン — finalize API でハッシュチェーン + KMS署名 + Evidence保存
-  btnFinal.addEventListener("click", async () => {
-    btnFinal.disabled = true;
-    btnFinal.textContent = "処理中...";
-    try {
-      const result = await finalizeSession(sessionId);
-      statusBar.textContent = "同意が完了しました";
-      statusBar.className = "status-bar completed";
-      btnFinal.textContent = "同意済み";
-
-      // 同意照会番号を表示
-      const refDiv = document.createElement("div");
-      refDiv.className = "status-bar completed";
-      refDiv.style.marginTop = "16px";
-      refDiv.innerHTML = `
-        <strong>同意照会番号:</strong> ${result.evidence_id}<br>
-        <small>ハッシュ: ${result.root_hash.substring(0, 16)}...</small>
-      `;
-      btnFinal.parentElement?.appendChild(refDiv);
-    } catch (e) {
-      console.error("Failed to finalize:", e);
-      btnFinal.disabled = false;
-      btnFinal.textContent = "最終同意";
     }
   });
 }
