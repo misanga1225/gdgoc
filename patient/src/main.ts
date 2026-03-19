@@ -1,5 +1,6 @@
 import "./styles.css";
 import { getSession, updateSessionStatus } from "./api";
+import { getSession, updateSessionStatus, finalizeSession, sendOtp, verifyOtp } from "./api";
 import { loadDocument } from "./document";
 import { createGazeProvider, MediaPipeGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
@@ -25,6 +26,11 @@ async function main() {
   } catch {
     app.innerHTML = `<div class="error">セッションが見つかりません。URLを確認してください。</div>`;
     return;
+  }
+
+  // OTP本人確認（未検証の場合のみ）
+  if (!session.otp_verified) {
+    await showOtpScreen(sessionId, session.name);
   }
 
   // UIを構築
@@ -115,6 +121,100 @@ async function main() {
       statusBar.textContent = "同意が完了しました";
       statusBar.className = "status-bar completed";
     }
+  });
+}
+
+/** OTP本人確認画面を表示し、検証完了まで待機する */
+function showOtpScreen(sessionId: string, patientName: string): Promise<void> {
+  return new Promise((resolve) => {
+    app.innerHTML = `
+      <div class="header">
+        <h1>Aurlum - 本人確認</h1>
+        <div class="session-info">${patientName} 様</div>
+      </div>
+      <div style="max-width:400px;margin:40px auto;padding:24px;">
+        <p>同意書を閲覧するには、本人確認が必要です。</p>
+        <p>登録されたメールアドレスに認証コードを送信します。</p>
+        <button class="btn btn-primary btn-block" id="btn-send-otp">認証コードを送信</button>
+        <div id="otp-input-area" style="display:none;margin-top:20px;">
+          <label for="otp-code">6桁の認証コード</label>
+          <input type="text" id="otp-code" maxlength="6" pattern="[0-9]{6}"
+            placeholder="000000" style="font-size:24px;text-align:center;letter-spacing:8px;width:100%;padding:12px;margin:8px 0;" />
+          <button class="btn btn-primary btn-block" id="btn-verify-otp">確認</button>
+          <button class="btn btn-block" id="btn-resend-otp" style="margin-top:8px;">再送信</button>
+        </div>
+        <div id="otp-message" style="margin-top:12px;"></div>
+      </div>
+    `;
+
+    const btnSend = document.getElementById("btn-send-otp") as HTMLButtonElement;
+    const otpInputArea = document.getElementById("otp-input-area")!;
+    const otpInput = document.getElementById("otp-code") as HTMLInputElement;
+    const btnVerify = document.getElementById("btn-verify-otp") as HTMLButtonElement;
+    const btnResend = document.getElementById("btn-resend-otp") as HTMLButtonElement;
+    const message = document.getElementById("otp-message")!;
+
+    async function doSendOtp() {
+      btnSend.disabled = true;
+      btnSend.textContent = "送信中...";
+      message.textContent = "";
+      try {
+        await sendOtp(sessionId);
+        otpInputArea.style.display = "block";
+        btnSend.style.display = "none";
+        message.textContent = "認証コードをメールに送信しました（5分間有効）";
+        message.style.color = "#059669";
+        otpInput.focus();
+      } catch (e) {
+        message.textContent = `送信エラー: ${e instanceof Error ? e.message : e}`;
+        message.style.color = "#dc2626";
+        btnSend.disabled = false;
+        btnSend.textContent = "認証コードを送信";
+      }
+    }
+
+    btnSend.addEventListener("click", doSendOtp);
+    btnResend.addEventListener("click", async () => {
+      btnResend.disabled = true;
+      try {
+        await sendOtp(sessionId);
+        message.textContent = "認証コードを再送信しました";
+        message.style.color = "#059669";
+      } catch (e) {
+        message.textContent = `再送信エラー: ${e instanceof Error ? e.message : e}`;
+        message.style.color = "#dc2626";
+      }
+      btnResend.disabled = false;
+    });
+
+    btnVerify.addEventListener("click", async () => {
+      const code = otpInput.value.trim();
+      if (code.length !== 6) {
+        message.textContent = "6桁のコードを入力してください";
+        message.style.color = "#dc2626";
+        return;
+      }
+      btnVerify.disabled = true;
+      btnVerify.textContent = "確認中...";
+      try {
+        const result = await verifyOtp(sessionId, code);
+        if (result.verified) {
+          resolve();
+        }
+      } catch (e) {
+        message.textContent = `${e instanceof Error ? e.message : e}`;
+        message.style.color = "#dc2626";
+        btnVerify.disabled = false;
+        btnVerify.textContent = "確認";
+      }
+    });
+
+    // Enterキーで確認
+    otpInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        btnVerify.click();
+      }
+    });
   });
 }
 

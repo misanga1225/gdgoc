@@ -1,6 +1,7 @@
 mod auth;
 mod firestore;
 mod kms;
+mod otp;
 mod storage;
 mod vertex_ai;
 
@@ -33,6 +34,7 @@ struct AppState {
     storage: StorageClient,
     ai: VertexAiClient,
     kms: KmsClient,
+    http: reqwest::Client,
 }
 
 async fn health() -> Json<Value> {
@@ -60,7 +62,10 @@ async fn create_session(
         expires_at,
     };
 
-    let fields = session_to_fields(&session);
+    let mut fields = session_to_fields(&session);
+    // patient_email はSession構造体に含めず、Firestoreのみに保存（PII層）
+    fields.insert("patient_email".to_string(), json!(req.patient_email));
+    fields.insert("otp_verified".to_string(), json!(false));
 
     match state.db.create_document("Patients", &session_id, fields).await {
         Ok(()) => {
@@ -405,6 +410,222 @@ async fn summarize_missed(
     }
 }
 
+/// OTP送信リクエスト
+#[derive(Deserialize)]
+struct SendOtpRequest {
+    // 将来的にresend等のフラグを追加可能
+}
+
+/// POST /sessions/:id/send-otp — OTP生成 + メール送信
+async fn send_otp(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    // bodyは空でもOK
+    _body: Option<Json<SendOtpRequest>>,
+) -> impl IntoResponse {
+    let fields = match state.db.get_document("Patients", &session_id).await {
+        Ok(f) => f,
+        Err(e) if e.to_string() == "not_found" => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
+    };
+
+    if let Err(e) = check_session_accessible(&fields) {
+        return e;
+    }
+
+    // 既にOTP検証済みの場合
+    if fields.get("otp_verified").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "OTP already verified" })),
+        );
+    }
+
+    let patient_email = fields
+        .get("patient_email")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if patient_email.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "no patient email registered" })),
+        );
+    }
+
+    // OTP生成
+    let otp_code = otp::generate_otp();
+    let otp_hash = otp::hash_otp(&otp_code);
+    let otp_expires_at = (Utc::now() + chrono::Duration::minutes(5)).to_rfc3339();
+
+    // Firestoreに保存
+    let mut update_fields = Map::new();
+    update_fields.insert("otp_hash".to_string(), json!(otp_hash));
+    update_fields.insert("otp_expires_at".to_string(), json!(otp_expires_at));
+    update_fields.insert("otp_attempts".to_string(), json!(0));
+
+    if let Err(e) = state
+        .db
+        .update_document(
+            "Patients",
+            &session_id,
+            update_fields,
+            &["otp_hash", "otp_expires_at", "otp_attempts"],
+        )
+        .await
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to save OTP: {}", e) })),
+        );
+    }
+
+    // メール送信
+    if let Err(e) = otp::send_otp_email(&state.http, &patient_email, &otp_code).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to send OTP email: {}", e) })),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({ "message": "OTP sent", "expires_in_seconds": 300 })),
+    )
+}
+
+/// OTP検証リクエスト
+#[derive(Deserialize)]
+struct VerifyOtpRequest {
+    code: String,
+}
+
+/// POST /sessions/:id/verify-otp — OTP検証
+async fn verify_otp(
+    State(state): State<AppState>,
+    Path(session_id): Path<String>,
+    Json(req): Json<VerifyOtpRequest>,
+) -> impl IntoResponse {
+    let fields = match state.db.get_document("Patients", &session_id).await {
+        Ok(f) => f,
+        Err(e) if e.to_string() == "not_found" => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "session not found" })),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            );
+        }
+    };
+
+    if let Err(e) = check_session_accessible(&fields) {
+        return e;
+    }
+
+    // 既にOTP検証済み
+    if fields.get("otp_verified").and_then(|v| v.as_bool()).unwrap_or(false) {
+        return (
+            StatusCode::OK,
+            Json(json!({ "verified": true })),
+        );
+    }
+
+    // 試行回数チェック
+    let attempts = fields
+        .get("otp_attempts")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    if attempts >= 5 {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({ "error": "too many attempts, please request a new OTP" })),
+        );
+    }
+
+    // 有効期限チェック
+    let otp_expires_at = fields
+        .get("otp_expires_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if let Ok(expiry) = otp_expires_at.parse::<DateTime<Utc>>() {
+        if Utc::now() > expiry {
+            return (
+                StatusCode::GONE,
+                Json(json!({ "error": "OTP expired, please request a new one" })),
+            );
+        }
+    }
+
+    // OTP照合
+    let stored_hash = fields
+        .get("otp_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let input_hash = otp::hash_otp(&req.code);
+
+    if input_hash != stored_hash {
+        // 試行回数インクリメント
+        let mut update_fields = Map::new();
+        update_fields.insert("otp_attempts".to_string(), json!(attempts + 1));
+        let _ = state
+            .db
+            .update_document("Patients", &session_id, update_fields, &["otp_attempts"])
+            .await;
+
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({
+                "error": "invalid OTP",
+                "remaining_attempts": 4u64.saturating_sub(attempts)
+            })),
+        );
+    }
+
+    // 検証成功
+    let now = Utc::now().to_rfc3339();
+    let mut update_fields = Map::new();
+    update_fields.insert("otp_verified".to_string(), json!(true));
+    update_fields.insert("otp_verified_at".to_string(), json!(now));
+
+    if let Err(e) = state
+        .db
+        .update_document(
+            "Patients",
+            &session_id,
+            update_fields,
+            &["otp_verified", "otp_verified_at"],
+        )
+        .await
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": format!("Failed to update verification: {}", e) })),
+        );
+    }
+
+    (
+        StatusCode::OK,
+        Json(json!({ "verified": true })),
+    )
+}
+
 /// POST /sessions/:id/finalize — 最終同意：ハッシュチェーン計算 + KMS署名 + Evidence保存
 async fn finalize_session(
     State(state): State<AppState>,
@@ -517,8 +738,15 @@ async fn finalize_session(
     // タイムスタンプ順にソート
     gaze_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
-    // ハッシュチェーン計算
-    let root_hash = compute_hash_chain(&session_id, &doc_hash, &gaze_entries);
+    // OTP検証タイムスタンプを取得
+    let otp_verified_at = fields
+        .get("otp_verified_at")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    // ハッシュチェーン計算（OTP検証情報を含む）
+    let root_hash = compute_hash_chain(&session_id, &doc_hash, &otp_verified_at, &gaze_entries);
 
     // KMS署名
     let kms_signature = match state.kms.sign(root_hash.as_bytes()).await {
@@ -538,6 +766,7 @@ async fn finalize_session(
     evidence_fields.insert("session_id".to_string(), json!(session_id));
     evidence_fields.insert("root_hash".to_string(), json!(root_hash));
     evidence_fields.insert("kms_signature".to_string(), json!(kms_signature));
+    evidence_fields.insert("otp_verified_at".to_string(), json!(otp_verified_at));
     evidence_fields.insert("blockchain_tx_hash".to_string(), json!(""));
     evidence_fields.insert("timestamp".to_string(), json!(now));
 
@@ -646,7 +875,8 @@ async fn main() {
     let ai = VertexAiClient::new(auth.clone(), &project_id, &region, &gemini_model);
     let kms = KmsClient::new(auth, &project_id, &region, &kms_key_ring, &kms_key_name);
 
-    let state = AppState { db, storage, ai, kms };
+    let http = reqwest::Client::new();
+    let state = AppState { db, storage, ai, kms, http };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -662,6 +892,8 @@ async fn main() {
         .route("/sessions/{id}", get(get_session))
         .route("/sessions/{id}/status", patch(update_session_status))
         .route("/documents/upload", post(upload_document))
+        .route("/sessions/{id}/send-otp", post(send_otp))
+        .route("/sessions/{id}/verify-otp", post(verify_otp))
         .route("/sessions/{id}/gaze", post(sync_gaze))
         .route(
             "/sessions/{id}/summarize-missed",
