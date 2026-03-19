@@ -96,7 +96,6 @@ export function renderDoctorMainPage(
   let isUpdating = false;
   let sessionCreatedAt: string | null = null;
   let sessionStatus = "waiting";
-  let initialSessionLoaded = false;
   let docParagraphs: DocParagraph[] = [];
   const gazeMap = new Map<string, GazeData>();
   /** 一度でもOK判定（dwell_time >= 閾値）になった段落IDを記録。以降の更新で見落としに戻さない */
@@ -263,9 +262,8 @@ export function renderDoctorMainPage(
     }
   }
 
-  void initializeSession();
-  subscribeRealtime();
   render();
+  void initializeSession().then(() => subscribeRealtime());
 
   async function initializeSession(): Promise<void> {
     try {
@@ -296,7 +294,6 @@ export function renderDoctorMainPage(
 
       documentTitle = extractDocumentTitle(documentHtml);
       docParagraphs = extractParagraphs(documentHtml);
-      initialSessionLoaded = true;
       render();
     } catch (error) {
       showToast(`セッション取得に失敗しました: ${error}`, "error");
@@ -321,7 +318,7 @@ export function renderDoctorMainPage(
           ? "d05-view-status is-viewing"
           : "d05-view-status is-away";
       }
-      if (sessionStatus === "completed" && prevStatus !== "completed" && initialSessionLoaded) {
+      if (sessionStatus === "completed" && prevStatus !== "completed") {
         showToast("患者が最終同意を完了しました。", "success");
         options?.onBackToD02?.();
         return;
