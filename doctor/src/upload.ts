@@ -189,7 +189,8 @@ export function renderUploadView(
       if (!isExistingSession) {
         const created = await createSession(
           nameInput.value.trim(),
-          idInput.value.trim()
+          idInput.value.trim(),
+          emailInput.value.trim()
         );
         destinationSessionId = created.session_id;
         patientUrl = created.patient_url;
@@ -198,14 +199,6 @@ export function renderUploadView(
       if (!destinationSessionId) {
         throw new Error("アップロード先セッションが特定できません");
       }
-      // ドキュメントごとに新しいセッション（=新しい署名付きURL）を作成する
-      const created = await createSession(
-        nameInput.value.trim(),
-        idInput.value.trim(),
-        emailInput.value.trim()
-      );
-      const destinationSessionId = created.session_id;
-      const patientUrl = created.patient_url;
 
       await uploadDocument(destinationSessionId, convertedHtml);
 

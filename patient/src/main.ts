@@ -1,6 +1,5 @@
 import "./styles.css";
-import { getSession, updateSessionStatus } from "./api";
-import { getSession, updateSessionStatus, finalizeSession, sendOtp, verifyOtp } from "./api";
+import { getSession, updateSessionStatus, sendOtp, verifyOtp } from "./api";
 import { loadDocument } from "./document";
 import { createGazeProvider, MediaPipeGazeProvider } from "./gaze";
 import { syncGazeData, watchSessionStatus } from "./sync";
