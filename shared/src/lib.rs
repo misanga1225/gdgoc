@@ -45,6 +45,7 @@ pub struct Session {
 pub struct CreateSessionRequest {
     pub name: String,
     pub patient_id: String,
+    pub patient_email: String,
 }
 
 /// ステータス更新リクエスト
@@ -63,16 +64,17 @@ pub struct GazeEntry {
 
 /// ハッシュチェーンを計算する
 ///
-/// H0 = SHA-256(session_id || document_hash)
+/// H0 = SHA-256(session_id || document_hash || otp_verified_at)
 /// Hn = SHA-256(H_{n-1} || paragraph_id || dwell_time || timestamp)
 ///
 /// gaze_entries はタイムスタンプ順にソートされていること
 pub fn compute_hash_chain(
     session_id: &str,
     document_hash: &str,
+    otp_verified_at: &str,
     gaze_entries: &[GazeEntry],
 ) -> String {
-    let mut hash = sha256(&format!("{}||{}", session_id, document_hash));
+    let mut hash = sha256(&format!("{}||{}||{}", session_id, document_hash, otp_verified_at));
 
     for entry in gaze_entries {
         hash = sha256(&format!(

@@ -6,10 +6,41 @@ export async function getSession(sessionId: string): Promise<{
   name: string;
   status: string;
   document_url: string;
+  otp_verified?: boolean;
 }> {
   const resp = await fetch(`${API_BASE}/sessions/${sessionId}`);
   if (!resp.ok) {
     throw new Error(`Session not found: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+/** OTP送信リクエスト */
+export async function sendOtp(sessionId: string): Promise<void> {
+  const resp = await fetch(`${API_BASE}/sessions/${sessionId}/send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error ?? `OTP send failed: ${resp.status}`);
+  }
+}
+
+/** OTP検証 */
+export async function verifyOtp(
+  sessionId: string,
+  code: string
+): Promise<{ verified: boolean }> {
+  const resp = await fetch(`${API_BASE}/sessions/${sessionId}/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!resp.ok) {
+    const err = await resp.json();
+    throw new Error(err.error ?? `OTP verification failed: ${resp.status}`);
   }
   return resp.json();
 }
