@@ -7,7 +7,7 @@ mod vertex_ai;
 
 use auth::{AuthenticatedDoctor, CertsCache};
 use axum::{
-    extract::{Path, State},
+    extract::{ConnectInfo, Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, patch, post},
@@ -22,11 +22,46 @@ use shared::{
     compute_hash_chain, hash_document, CreateSessionRequest, GazeEntry, Session, SessionStatus,
     UpdateStatusRequest,
 };
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 use storage::StorageClient;
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 use vertex_ai::{MissedParagraph, VertexAiClient};
+
+/// 同一IPからのリクエスト数を制限するレートリミッター（1秒あたり10件、バースト最大20件）
+#[derive(Clone)]
+struct RateLimiter {
+    inner: Arc<Mutex<HashMap<String, Vec<Instant>>>>,
+    window: Duration,
+    max_requests: usize,
+}
+
+impl RateLimiter {
+    fn new(window_secs: u64, max_requests: usize) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            window: Duration::from_secs(window_secs),
+            max_requests,
+        }
+    }
+
+    fn check(&self, key: &str) -> bool {
+        let now = Instant::now();
+        let mut map = self.inner.lock().unwrap();
+        let entries = map.entry(key.to_string()).or_default();
+        entries.retain(|&t| now.duration_since(t) < self.window);
+        if entries.len() >= self.max_requests {
+            return false;
+        }
+        entries.push(now);
+        true
+    }
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -35,6 +70,7 @@ struct AppState {
     ai: VertexAiClient,
     kms: KmsClient,
     http: reqwest::Client,
+    rate_limiter: RateLimiter,
 }
 
 async fn health() -> Json<Value> {
@@ -43,10 +79,17 @@ async fn health() -> Json<Value> {
 
 /// POST /sessions — セッション作成
 async fn create_session(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     _doctor: AuthenticatedDoctor,
     State(state): State<AppState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> impl IntoResponse {
+    if !state.rate_limiter.check(&addr.ip().to_string()) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({ "error": "rate limit exceeded" })),
+        );
+    }
     let session_id = Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
     let expires_at = (Utc::now() + chrono::Duration::hours(24)).to_rfc3339();
@@ -418,11 +461,18 @@ struct SendOtpRequest {
 
 /// POST /sessions/:id/send-otp — OTP生成 + メール送信
 async fn send_otp(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<AppState>,
     Path(session_id): Path<String>,
     // bodyは空でもOK
     _body: Option<Json<SendOtpRequest>>,
 ) -> impl IntoResponse {
+    if !state.rate_limiter.check(&addr.ip().to_string()) {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({ "error": "rate limit exceeded" })),
+        );
+    }
     let fields = match state.db.get_document("Patients", &session_id).await {
         Ok(f) => f,
         Err(e) if e.to_string() == "not_found" => {
@@ -860,7 +910,8 @@ async fn main() {
     let kms = KmsClient::new(auth, &project_id, &region, &kms_key_ring, &kms_key_name);
 
     let http = reqwest::Client::new();
-    let state = AppState { db, storage, ai, kms, http };
+    let rate_limiter = RateLimiter::new(1, 20); // 1秒あたり最大20リクエスト
+    let state = AppState { db, storage, ai, kms, http, rate_limiter };
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -901,7 +952,10 @@ async fn main() {
         .await
         .expect("Failed to bind");
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("Server error");
 }
