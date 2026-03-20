@@ -8,7 +8,7 @@ mod vertex_ai;
 use auth::{AuthenticatedDoctor, CertsCache};
 use axum::{
     extract::{ConnectInfo, Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, patch, post},
     Json, Router,
@@ -53,14 +53,34 @@ impl RateLimiter {
     fn check(&self, key: &str) -> bool {
         let now = Instant::now();
         let mut map = self.inner.lock().unwrap();
-        let entries = map.entry(key.to_string()).or_default();
-        entries.retain(|&t| now.duration_since(t) < self.window);
-        if entries.len() >= self.max_requests {
+
+        // 期限切れエントリを削除し、空になったキーはマップから除去（メモリリーク防止）
+        if let Some(entries) = map.get_mut(key) {
+            entries.retain(|&t| now.duration_since(t) < self.window);
+        }
+        if map.get(key).map(|v| v.is_empty()).unwrap_or(false) {
+            map.remove(key);
+        }
+
+        // リクエスト数チェック
+        let count = map.get(key).map(|v| v.len()).unwrap_or(0);
+        if count >= self.max_requests {
             return false;
         }
-        entries.push(now);
+
+        map.entry(key.to_string()).or_default().push(now);
         true
     }
+}
+
+/// Cloud Run等のリバースプロキシ環境では X-Forwarded-For が実クライアントIPを持つ
+fn client_ip(headers: &HeaderMap, addr: SocketAddr) -> String {
+    headers
+        .get("X-Forwarded-For")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| addr.ip().to_string())
 }
 
 #[derive(Clone)]
@@ -82,9 +102,10 @@ async fn create_session(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     _doctor: AuthenticatedDoctor,
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateSessionRequest>,
 ) -> impl IntoResponse {
-    if !state.rate_limiter.check(&addr.ip().to_string()) {
+    if !state.rate_limiter.check(&client_ip(&headers, addr)) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({ "error": "rate limit exceeded" })),
@@ -464,10 +485,11 @@ async fn send_otp(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<AppState>,
     Path(session_id): Path<String>,
+    headers: HeaderMap,
     // bodyは空でもOK
     _body: Option<Json<SendOtpRequest>>,
 ) -> impl IntoResponse {
-    if !state.rate_limiter.check(&addr.ip().to_string()) {
+    if !state.rate_limiter.check(&client_ip(&headers, addr)) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({ "error": "rate limit exceeded" })),
