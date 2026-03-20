@@ -112,7 +112,7 @@ $$
 w_i = \frac{c_i}{1 + \sigma_i^2}
 $$
 
-- $c_i = \text{detected}\_\text{confidence}_i \times \text{base}\_\text{confidence}_i$
+- $c_i = {\text{detected}\_\text{confidence}}_i \times {\text{base}\_\text{confidence}}_i$
 - $\sigma_i^2$: スライディングウィンドウ内のスコア分散
 
 | パラメータ | 値 |
@@ -129,8 +129,8 @@ $$
 ### 4.1 虹彩位置比率
 
 $$
-\text{iris}\_\text{ratio}_X = \frac{x_{\text{iris}} - x_{\text{inner}}}{x_{\text{outer}} - x_{\text{inner}}}, \quad
-\text{iris}\_\text{ratio}_Y = \frac{y_{\text{iris}} - y_{\text{upper}}}{y_{\text{lower}} - y_{\text{upper}}}
+{\text{iris}\_\text{ratio}}_X = \frac{x_{\text{iris}} - x_{\text{inner}}}{x_{\text{outer}} - x_{\text{inner}}}, \quad
+{\text{iris}\_\text{ratio}}_Y = \frac{y_{\text{iris}} - y_{\text{upper}}}{y_{\text{lower}} - y_{\text{upper}}}
 $$
 
 結果は $[0,1]$ に正規化され、0.5 が正面注視に対応する。
@@ -144,7 +144,7 @@ $$
 ### 4.3 眼の信頼度
 
 $$
-c_{\text{EAR}} = \min\!\left(\frac{\text{norm}\_\text{eye}\_\text{height}}{0.35},\ 1\right), \quad
+c_{\text{EAR}} = \min\!\left(\frac{{\text{norm}\_\text{eye}\_\text{height}}}{0.35},\ 1\right), \quad
 c_z = \max(0,\ 1 - z_{\text{range}} / 0.03)
 $$
 
