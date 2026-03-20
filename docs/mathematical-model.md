@@ -144,7 +144,7 @@ $$
 ### 4.3 眼の信頼度
 
 $$
-c_{\text{EAR}} = \min\!\left(\frac{{\text{norm}\_\text{eye}\_\text{height}}}{0.35},\ 1\right), \quad
+c_{\text{EAR}} = \min\!\left(\frac{\text{norm_eye_height}}{0.35},\ 1\right), \quad
 c_z = \max(0,\ 1 - z_{\text{range}} / 0.03)
 $$
 
