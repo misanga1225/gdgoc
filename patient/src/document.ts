@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 /**
  * Cloud StorageからHTMLドキュメントを取得してDOMに挿入する
  * @returns data-paragraph-id属性を持つ全要素の配列
@@ -12,7 +14,7 @@ export async function loadDocument(
   }
 
   const html = await resp.text();
-  container.innerHTML = html;
+  container.innerHTML = DOMPurify.sanitize(html);
 
   // data-paragraph-id属性を持つ全要素を収集
   const paragraphs = Array.from(
