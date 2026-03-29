@@ -36,7 +36,7 @@ P_g = \exp\!\left(-\frac{d^2}{2\sigma^2}\right)
 $$
 
 $$
-\sigma = \max(\sigma_{\text{base}},\ \text{calibration}\_\text{error} \times 1.5), \quad \sigma_{\text{base}} = r_\sigma \times R
+\sigma = \max(\sigma_{\text{base}},\ \text{calibration_error} \times 1.5), \quad \sigma_{\text{base}} = r_\sigma \times R
 $$
 
 - $d$: 視線点と対象領域中心のユークリッド距離（正規化座標）
@@ -112,7 +112,7 @@ $$
 w_i = \frac{c_i}{1 + \sigma_i^2}
 $$
 
-- $c_i = {\text{detected}\_\text{confidence}}_i \times {\text{base}\_\text{confidence}}_i$
+- $c_i = \text{detected_confidence}_i \times \text{base_confidence}_i$
 - $\sigma_i^2$: スライディングウィンドウ内のスコア分散
 
 | パラメータ | 値 |
@@ -129,8 +129,8 @@ $$
 ### 4.1 虹彩位置比率
 
 $$
-{\text{iris}\_\text{ratio}}_X = \frac{x_{\text{iris}} - x_{\text{inner}}}{x_{\text{outer}} - x_{\text{inner}}}, \quad
-{\text{iris}\_\text{ratio}}_Y = \frac{y_{\text{iris}} - y_{\text{upper}}}{y_{\text{lower}} - y_{\text{upper}}}
+\text{iris_ratio}_X = \frac{x_{\text{iris}} - x_{\text{inner}}}{x_{\text{outer}} - x_{\text{inner}}}, \quad
+\text{iris_ratio}_Y = \frac{y_{\text{iris}} - y_{\text{upper}}}{y_{\text{lower}} - y_{\text{upper}}}
 $$
 
 結果は $[0,1]$ に正規化され、0.5 が正面注視に対応する。
@@ -167,7 +167,7 @@ $$
 **角度依存の信頼度低減**:
 
 $$
-\text{reliability} = \max\!\left(0.4,\ \cos\!\left(\frac{\pi}{2} \cdot \frac{|\text{yaw}|}{45°}\right) \cdot \cos\!\left(\frac{\pi}{2} \cdot \frac{|\text{pitch}|}{35°}\right)\right)
+\text{reliability} = \max\!\left(0.4,\ \cos\!\left(\frac{\pi}{2} \cdot \frac{|\text{yaw}|}{45^\circ}\right) \cdot \cos\!\left(\frac{\pi}{2} \cdot \frac{|\text{pitch}|}{35^\circ}\right)\right)
 $$
 
 ---
