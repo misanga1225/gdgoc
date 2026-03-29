@@ -7,9 +7,9 @@ Expected directory layout::
             day01/
                 0001.jpg
                 ...
-            pXX.label              # per-person label file
+            pXX.txt                # per-person label file
 
-Each ``.label`` row:  image_path  yaw(rad)  pitch(rad)  ...
+Each ``.txt`` row:  image_path  yaw(rad)  pitch(rad)  ...
 We convert to degrees and discretise into bins for compatibility with
 the L2CS-Net output format.
 
@@ -80,7 +80,7 @@ class MPIIFaceGazeDataset(Dataset):
 
         for pid in person_ids:
             person_dir = self.root / f"p{pid:02d}"
-            label_file = person_dir / f"p{pid:02d}.label"
+            label_file = person_dir / f"p{pid:02d}.txt"
             if not label_file.exists():
                 continue
             with open(label_file) as f:
