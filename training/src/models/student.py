@@ -26,7 +26,9 @@ class L2CSNetLite(nn.Module):
             num_classes=0,       # remove classifier head
             global_pool="avg",   # (B, 576)
         )
-        feat_dim = self.backbone.num_features  # 576 for mobilenetv3_small_100
+        # Detect actual feature dim (num_features can be unreliable across timm versions)
+        with torch.no_grad():
+            feat_dim = self.backbone(torch.zeros(1, 3, 224, 224)).shape[1]
 
         # --- heads (same interface as teacher) ---
         self.fc_yaw = nn.Linear(feat_dim, num_bins)
