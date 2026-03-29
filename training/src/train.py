@@ -59,7 +59,7 @@ def softmax_expectation(logits: torch.Tensor, num_bins: int) -> torch.Tensor:
 # --------------------------------------------------------------------------- #
 
 def train_one_epoch(
-    teacher: nn.Module,
+    teacher: nn.Module | None,
     student: nn.Module,
     loader: DataLoader,
     criterion: DistillationLoss,
@@ -68,7 +68,8 @@ def train_one_epoch(
     num_bins: int,
 ) -> dict[str, float]:
     student.train()
-    teacher.eval()
+    if teacher is not None:
+        teacher.eval()
 
     total_loss = 0.0
     total_kd = 0.0
@@ -83,9 +84,13 @@ def train_one_epoch(
         yaw_deg = batch["yaw_deg"].to(device)
         pitch_deg = batch["pitch_deg"].to(device)
 
-        # Teacher forward (no grad)
-        with torch.no_grad():
-            t_yaw, t_pitch = teacher(images)
+        # Teacher soft targets: from cache or live forward
+        if "t_yaw" in batch:
+            t_yaw = batch["t_yaw"].to(device)
+            t_pitch = batch["t_pitch"].to(device)
+        else:
+            with torch.no_grad():
+                t_yaw, t_pitch = teacher(images)
 
         # Student forward
         s_yaw, s_pitch = student(images)
@@ -171,17 +176,27 @@ def main() -> None:
 
     # --- models ---
     num_bins = cfg.teacher.num_bins
+    data_root = Path(cfg.data.data_root)
 
-    teacher = L2CSNet(num_bins=num_bins).to(device)
-    weights_path = Path(cfg.data.data_root) / cfg.teacher.weights
-    if weights_path.exists():
-        L2CSNet.load_official_weights(teacher, weights_path, device=device)
-        print(f"Loaded teacher weights from {weights_path}")
+    # Check for pre-computed soft target caches
+    train_cache = data_root / "soft_targets_train.pt"
+    val_cache = data_root / "soft_targets_val.pt"
+    use_cache = train_cache.exists()
+
+    if use_cache:
+        print(f"Using cached soft targets (teacher model will NOT be loaded)")
+        teacher = None
     else:
-        print(f"WARNING: Teacher weights not found at {weights_path}, using random init")
-    teacher.eval()
-    for p in teacher.parameters():
-        p.requires_grad = False
+        teacher = L2CSNet(num_bins=num_bins).to(device)
+        weights_path = data_root / cfg.teacher.weights
+        if weights_path.exists():
+            L2CSNet.load_official_weights(teacher, weights_path, device=device)
+            print(f"Loaded teacher weights from {weights_path}")
+        else:
+            print(f"WARNING: Teacher weights not found at {weights_path}, using random init")
+        teacher.eval()
+        for p in teacher.parameters():
+            p.requires_grad = False
 
     student = L2CSNetLite(num_bins=num_bins).to(device)
     wandb.watch(student, log="gradients", log_freq=100)
@@ -190,6 +205,7 @@ def main() -> None:
     train_ds = MPIIFaceGazeDataset(
         cfg.data.data_root, split="train",
         image_size=cfg.data.image_size, num_bins=num_bins,
+        soft_targets_path=train_cache if use_cache else None,
     )
     val_ds = MPIIFaceGazeDataset(
         cfg.data.data_root, split="val",
