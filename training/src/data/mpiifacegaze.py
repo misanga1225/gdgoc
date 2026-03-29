@@ -63,6 +63,7 @@ class MPIIFaceGazeDataset(Dataset):
         person_ids: list[int] | None = None,
         image_size: int = 224,
         num_bins: int = 90,
+        soft_targets_path: str | Path | None = None,
     ) -> None:
         super().__init__()
         self.root = Path(data_root) / "mpiifacegaze"
@@ -96,6 +97,18 @@ class MPIIFaceGazeDataset(Dataset):
                     if img_path.exists():
                         self.samples.append((img_path, yaw_deg, pitch_deg))
 
+        # Load pre-computed teacher soft targets if available
+        self.soft_targets: dict[str, torch.Tensor] | None = None
+        if soft_targets_path is not None:
+            st_path = Path(soft_targets_path)
+            if st_path.exists():
+                self.soft_targets = torch.load(st_path, weights_only=True)
+                assert self.soft_targets["yaw"].shape[0] == len(self.samples), (
+                    f"Cache size mismatch: {self.soft_targets['yaw'].shape[0]} "
+                    f"vs {len(self.samples)} samples"
+                )
+                print(f"Loaded soft targets from {st_path}")
+
         if split == "train":
             self.transform = transforms.Compose([
                 transforms.ToPILImage(),
@@ -126,10 +139,16 @@ class MPIIFaceGazeDataset(Dataset):
 
         img_tensor = self.transform(img)
 
-        return {
+        result = {
             "image": img_tensor,
             "yaw_bin": torch.tensor(_angle_to_bin(yaw_deg, self.num_bins), dtype=torch.long),
             "pitch_bin": torch.tensor(_angle_to_bin(pitch_deg, self.num_bins), dtype=torch.long),
             "yaw_deg": torch.tensor(yaw_deg, dtype=torch.float32),
             "pitch_deg": torch.tensor(pitch_deg, dtype=torch.float32),
         }
+
+        if self.soft_targets is not None:
+            result["t_yaw"] = self.soft_targets["yaw"][idx]
+            result["t_pitch"] = self.soft_targets["pitch"][idx]
+
+        return result
