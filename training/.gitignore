@@ -1,5 +1,5 @@
-# Data
-data/
+# Data (datasets directory, not src/data/)
+/data/
 *.pkl
 *.pt
 *.pth

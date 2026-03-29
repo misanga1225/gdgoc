@@ -21,8 +21,7 @@ training:
   seed: 42
 
 data:
-  train_dataset: gaze360
-  eval_dataset: mpiifacegaze
+  dataset: mpiifacegaze
   data_root: "./data"
   image_size: 224
   num_workers: 4
