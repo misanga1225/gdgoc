@@ -1,0 +1,32 @@
+teacher:
+  arch: resnet50
+  weights: "L2CSNet_gaze360.pkl"
+  num_bins: 90
+
+student:
+  arch: mobilenetv3_small_100
+  num_bins: 90
+
+distillation:
+  alpha: 0.7        # KD loss weight (1-alpha = hard label weight)
+  temperature: 4.0   # Softmax temperature for KD
+
+training:
+  epochs: 50
+  batch_size: 128
+  lr: 1.0e-3
+  weight_decay: 0.01
+  scheduler: cosine
+  early_stopping_patience: 10
+  seed: 42
+
+data:
+  train_dataset: gaze360
+  eval_dataset: mpiifacegaze
+  data_root: "./data"
+  image_size: 224
+  num_workers: 4
+
+wandb:
+  project: "l2cs-distill"
+  entity: null

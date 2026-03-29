@@ -1,0 +1,23 @@
+# Data
+data/
+*.pkl
+*.pt
+*.pth
+
+# ONNX outputs
+outputs/
+*.onnx
+
+# W&B
+wandb/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Checkpoints
+checkpoints/
