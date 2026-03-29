@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 import wandb
 
-from .data import Gaze360Dataset, MPIIFaceGazeDataset
+from .data import MPIIFaceGazeDataset
 from .distill import DistillationLoss
 from .models import L2CSNet, L2CSNetLite
 
@@ -187,11 +187,11 @@ def main() -> None:
     wandb.watch(student, log="gradients", log_freq=100)
 
     # --- data ---
-    train_ds = Gaze360Dataset(
+    train_ds = MPIIFaceGazeDataset(
         cfg.data.data_root, split="train",
         image_size=cfg.data.image_size, num_bins=num_bins,
     )
-    val_ds = Gaze360Dataset(
+    val_ds = MPIIFaceGazeDataset(
         cfg.data.data_root, split="val",
         image_size=cfg.data.image_size, num_bins=num_bins,
     )
